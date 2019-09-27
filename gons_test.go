@@ -15,14 +15,35 @@
 package gons
 
 import (
+	"os"
+	"os/exec"
+
+	"github.com/moby/moby/pkg/reexec"
 	. "github.com/onsi/ginkgo"
-	//. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("gons", func() {
 
-	It("Succeeds", func() {
+	// Basic self-check that reexecution is working and doesn't trigger an
+	// infinite loop.
+	It("reexecutes itself", func() {
+		cmd := reexec.Command("foo", "-ginkgo.focus=NOTESTS")
+		out, err := cmd.Output()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(out)).To(ContainSubstring("Running Suite: gons suite"))
+	})
 
+	It("aborts on reexecution for invalid namespace reference", func() {
+		cmd := reexec.Command("foo")
+		cmd.Env = os.Environ()
+		cmd.Env = append(cmd.Env, "netns=/foo")
+		_, err := cmd.Output()
+		Expect(err).To(HaveOccurred())
+		ee, ok := err.(*exec.ExitError)
+		Expect(ok).To(BeTrue())
+		Expect(string(ee.Stderr)).To(Equal(
+			"initns: invalid netns reference \"/foo\"\n"))
 	})
 
 })

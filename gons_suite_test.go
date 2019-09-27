@@ -21,7 +21,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestFindmnt(t *testing.T) {
+func TestGons(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "gons suite")
 }

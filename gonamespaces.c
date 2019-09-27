@@ -106,24 +106,25 @@ void gonamespaces(void) {
             if (nsref < 0) {
                 logerr("initns: invalid %s reference \"%s\"", 
                     namespaces[nsidx].symname, nsenv);
-                continue;
+                exit(1);
             }
             /*
-            * Do not use the glibc version of setns, but go for the syscall itself. This
-            * allows us to avoid dynamically linking to glibc even when using cgo,
-            * resorting to musl, et cetera. As musl is a mixed bag in terms of its glibc
-            * compatibility, especially in such dark corners as Linux namespaces, we try
-            * to minimize problematic dependencies here.
+            * Do not use the glibc version of setns, but go for the syscall
+            * itself. This allows us to avoid dynamically linking to glibc
+            * even when using cgo, resorting to musl, et cetera. As musl is a
+            * mixed bag in terms of its glibc compatibility, especially in
+            * such dark corners as Linux namespaces, we try to minimize
+            * problematic dependencies here.
             *
-            * A useful reference is Dominik Honnef's blog post "Statically compiled Go
-            * programs, always, even with cgo, using musl":
+            * A useful reference is Dominik Honnef's blog post "Statically
+            * compiled Go programs, always, even with cgo, using musl":
             * https://dominik.honnef.co/posts/2015/06/statically_compiled_go_programs__always__even_with_cgo__using_musl/
             */
             if (syscall(SYS_setns, nsref, namespaces[nsidx].nstype) < 0) {
-                /* Braindead last-resort stderr cry for help... */
                 logerr("initns: cannot join %s to reference \"%s\": %s", 
                     namespaces[nsidx].symname, nsenv,
                     strerror(errno));
+                exit(1);
             }
             /*
              * Release namespace reference fd, as by now our process should
