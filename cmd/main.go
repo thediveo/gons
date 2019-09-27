@@ -26,9 +26,20 @@ func SwitchedNamespaces() {
 
 func main() {
 	if reexec.Init() {
-		fmt.Printf("Restarted child started and done.\n")
+		fmt.Printf("Restarted child started.\n")
+		for _, ns := range []string{"cgroup", "ipc", "mnt", "net", "pid", "user", "uts"} {
+			if nsref, err := os.Readlink(fmt.Sprintf("/proc/self/ns/%s", ns)); err == nil {
+				fmt.Printf("%s\n", nsref)
+			}
+		}
+		fmt.Printf("Restarted child done.\n")
 	} else {
 		fmt.Printf("Started.\n")
+
+		if len(os.Args) >= 2 {
+			os.Setenv("netns", fmt.Sprintf("/proc/%s/ns/net", os.Args[1]))
+		}
+
 		cmd := reexec.Command("switch-namespaces")
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
