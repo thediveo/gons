@@ -15,6 +15,7 @@
 package gons
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 
@@ -34,7 +35,8 @@ var _ = Describe("gons", func() {
 		Expect(string(out)).To(ContainSubstring("Running Suite: gons suite"))
 	})
 
-	It("aborts on reexecution for invalid namespace reference", func() {
+	// Reexecute with an invalid namespace reference.
+	It("aborts reexecution for invalid namespace reference", func() {
 		cmd := reexec.Command("foo", "-ginkgo.focus=NOTESTS")
 		cmd.Env = os.Environ()
 		cmd.Env = append(cmd.Env, "netns=/foo")
@@ -46,4 +48,34 @@ var _ = Describe("gons", func() {
 			"gonamespaces: invalid netns reference \"/foo\": "))
 	})
 
+	It("switches namespaces when reexecuting", func() {
+		cmd := reexec.Command("reexecutee", "-ginkgo.focus=NOTESTS")
+		out, err := cmd.Output()
+		Expect(err).To(HaveOccurred())
+		ee, ok := err.(*exec.ExitError)
+		Expect(ok).To(BeTrue())
+		Expect(ee.ExitCode()).To(Equal(42))
+		Expect(string(out)).To(ContainSubstring("net:["))
+	})
+
 })
+
+// Make sure that we have a reexecution handler installed for some of our
+// tests: it will be run inside the reexecuted child, and its output is then
+// checked in the parent running the test cases.
+func init() {
+	reexec.Register("reexecutee", func() {
+		// Dump all namespace identifiers to allow checks on what really
+		// happened...
+		for _, ns := range []string{"cgroup", "ipc", "mnt", "net", "pid", "user", "uts"} {
+			if nsref, err := os.Readlink(fmt.Sprintf("/proc/self/ns/%s", ns)); err == nil {
+				fmt.Printf("%s\n", nsref)
+			}
+		}
+		os.Exit(42)
+	})
+	// Ensure that the registered handler is run in the reexecuted child. This
+	// won't trigger the handler while we're in the parent, because the
+	// parent's Arg[0] won't match the name of our handler.
+	reexec.Init()
+}
