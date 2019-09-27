@@ -104,8 +104,9 @@ void gonamespaces(void) {
              */
             int nsref = open(nsenv, O_RDONLY);
             if (nsref < 0) {
-                logerr("initns: invalid %s reference \"%s\"", 
-                    namespaces[nsidx].symname, nsenv);
+                logerr("initns: invalid %s reference \"%s\": %s", 
+                    namespaces[nsidx].symname, nsenv,
+                    strerror(errno));
                 exit(1);
             }
             /*

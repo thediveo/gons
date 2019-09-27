@@ -35,15 +35,15 @@ var _ = Describe("gons", func() {
 	})
 
 	It("aborts on reexecution for invalid namespace reference", func() {
-		cmd := reexec.Command("foo")
+		cmd := reexec.Command("foo", "-ginkgo.focus=NOTESTS")
 		cmd.Env = os.Environ()
 		cmd.Env = append(cmd.Env, "netns=/foo")
 		_, err := cmd.Output()
 		Expect(err).To(HaveOccurred())
 		ee, ok := err.(*exec.ExitError)
 		Expect(ok).To(BeTrue())
-		Expect(string(ee.Stderr)).To(Equal(
-			"initns: invalid netns reference \"/foo\"\n"))
+		Expect(string(ee.Stderr)).To(ContainSubstring(
+			"initns: invalid netns reference \"/foo\": "))
 	})
 
 })
