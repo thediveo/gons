@@ -43,7 +43,7 @@ var _ = Describe("gons", func() {
 		ee, ok := err.(*exec.ExitError)
 		Expect(ok).To(BeTrue())
 		Expect(string(ee.Stderr)).To(ContainSubstring(
-			"initns: invalid netns reference \"/foo\": "))
+			"gonamespaces: invalid netns reference \"/foo\": "))
 	})
 
 })

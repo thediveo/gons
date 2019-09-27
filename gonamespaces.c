@@ -104,7 +104,7 @@ void gonamespaces(void) {
              */
             int nsref = open(nsenv, O_RDONLY);
             if (nsref < 0) {
-                logerr("initns: invalid %s reference \"%s\": %s", 
+                logerr("gonamespaces: invalid %s reference \"%s\": %s", 
                     namespaces[nsidx].symname, nsenv,
                     strerror(errno));
                 exit(1);
@@ -122,7 +122,7 @@ void gonamespaces(void) {
             * https://dominik.honnef.co/posts/2015/06/statically_compiled_go_programs__always__even_with_cgo__using_musl/
             */
             if (syscall(SYS_setns, nsref, namespaces[nsidx].nstype) < 0) {
-                logerr("initns: cannot join %s to reference \"%s\": %s", 
+                logerr("gonamespaces: cannot join %s to reference \"%s\": %s", 
                     namespaces[nsidx].symname, nsenv,
                     strerror(errno));
                 exit(1);
