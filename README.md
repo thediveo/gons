@@ -1,9 +1,9 @@
 # gons
 
-`gons` ("go [*into*] namespaces") is a Go package that selectively switches
-your Go application to other already existing Linux namespaces. This must
-happen before the Go runtime spins up, blocking certain namespace changes,
-such as changing into a different mount namespace.
+`gons` ("go [*into*] namespaces") is a small Go package that selectively
+switches your Go application into other already existing Linux namespaces.
+This must happen before the Go runtime spins up, blocking certain namespace
+changes, such as changing into a different mount namespace.
 
 - `gons` switches the Go application *itself* it is linked to into a set of
   already existing namespaces.
@@ -18,14 +18,15 @@ package.
 The existing namespaces to join/switch into are referenced by their paths in
 the filesystem (such as `/proc/123456/ns/mnt`), and are specified using
 environment variables. Set only the environment variables for those namespaces
-that should be switched at startup. The names of the environment variables are
-as follows:
+that should be switched at startup. These variables need to be set before your
+application is started. The names of the environment variables are as follows
+and must be all lowercase:
 
 - `cgroupns=...`
 - `ipcns=...`
 - `mntns=...`
 - `netns=...`
-- `pidns=...` (*please note that this does not switch your applications own
+- `pidns=...` (*please note that this does not switch your application's own
   PID namespace, but rather controls the PID namespace any child processes of
   your application will be put into.*)
 - `userns=...`
