@@ -19,17 +19,36 @@ import (
 	"os"
 	"testing"
 
+	"github.com/moby/moby/pkg/reexec"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 func TestGonsSuite(t *testing.T) {
 	// If there was a failure in switching namespaces during inital startup,
-	// then report this and end the process with a non-zero status.
+	// then report this and end the process with a non-zero status. We do this
+	// regardless of whether we're the original test or a reexecuted child.
 	if err := Status(); err != nil {
 		io.WriteString(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "gons suite")
+	// There were no namespace switching errors, so we next register this
+	// generic reexecution handler that helps our test procedures. It simply
+	// puts the reexecuted child to sleep, waiting to be killed. This allows
+	// the parent test to examine the child's namespaces taking all the time
+	// it needs in order to figure out if all went well.
+	reexec.Register("sleepingunbeauty", func() {
+		// Just keep this reexecuted child sleeping; we will be killed by our
+		// parent when the test is done. What a lovely family.
+		select {}
+	})
+	// Ensure that the registered handler is run in the reexecuted child. This
+	// won't trigger the handler while we're in the parent, because the
+	// parent's Arg[0] won't match the name of our handler.
+	if !reexec.Init() {
+		// Okay, we're a real test suite, and there was no reexecuted child
+		// handler triggering... :)
+		RegisterFailHandler(Fail)
+		RunSpecs(t, "gons suite")
+	}
 }

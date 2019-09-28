@@ -134,7 +134,7 @@ void gonamespaces(void) {
             * https://dominik.honnef.co/posts/2015/06/statically_compiled_go_programs__always__even_with_cgo__using_musl/
             */
             if (syscall(SYS_setns, nsref, namespaces[nsidx].nstype) < 0) {
-                logerr("package gons: cannot join %s to reference \"%s\": %s", 
+                logerr("package gons: cannot join %s using reference \"%s\": %s", 
                     namespaces[nsidx].symname, nsenv,
                     strerror(errno));
                 close(nsref);

@@ -138,16 +138,3 @@ var _ = Describe("gons", func() {
 	})
 
 })
-
-// Make sure that we have a reexecution handler installed as test helpers.
-func init() {
-	reexec.Register("sleepingunbeauty", func() {
-		// Just keep this reexecuted child sleeping; we will be killed by our
-		// parent when the test is done. What a lovely family.
-		select {}
-	})
-	// Ensure that the registered handler is run in the reexecuted child. This
-	// won't trigger the handler while we're in the parent, because the
-	// parent's Arg[0] won't match the name of our handler.
-	reexec.Init()
-}
