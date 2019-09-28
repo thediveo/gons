@@ -8,7 +8,7 @@ This must happen before the Go runtime spins up, blocking certain namespace
 changes, such as changing into a different mount namespace.
 
 - `gons` switches the Go application *itself* it is linked to into a set of
-  already existing namespaces.
+  already existing namespaces, and only so at *startup*.
 - `gons` does *neither fork nor re-execute* in order to switch namespaces.
 - `gons` *does not* create new namespaces.
 
@@ -45,5 +45,5 @@ single-threaded and that's only the case before the Go runtime is spinning up.
 
 ## Copyright and License
 
-`gons` is Copyright 2018 Harald Albrecht, and licensed under the Apache
+`gons` is Copyright 2019 Harald Albrecht, and licensed under the Apache
 License, Version 2.0.
