@@ -42,6 +42,7 @@
 #include <fcntl.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <limits.h>
 
 /* Describes a specific type of Linux kernel namespace supported by gons. */
 struct ns_t {
@@ -65,26 +66,37 @@ static const struct ns_t namespaces[] = {
 };
 
 /*
- * Our last-resort error reporting through fd 2, a.k.a. stderr. Well, let's
- * hope that it is stderr. Each message gets always automtatically terminated
- * with a \n.
+ * If not NULL, then points to a buffer with an error message for later
+ * consumption by an application in order to detect namespace switching
+ * errors. Its size not only accounts for the maximum path size, but also for
+ * some descriptive text prefixing it.
+ */
+char *gonsmsg;
+static unsigned int maxmsgsize;
+
+/*
+ * Our last-resort error reporting, which the application should later pick up
+ * by calling the Go function gons.Status().
  */
 static void logerr(const char *format, ...) {
-    char msg[1024] = {};
     va_list args;
-    
-    va_start(args, format);
-    if (vsnprintf(msg, sizeof(msg), format, args) >= 0) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-result"
-        /*
-         * He who has never ignored printf()'s return value, cast the first
-         * stone.
-         */
-        write(2, msg, strlen(msg));
-        write(2, "\n", 1);
+    /* Create a buffer if not done so. */
+    if (!gonsmsg) {
+        maxmsgsize = 256 + PATH_MAX;
+        gonsmsg = (char *) malloc(maxmsgsize);
+        if (!gonsmsg) {
+            /* Handle oom and protect against overwriting this message */
+            gonsmsg = "malloc error";
+            maxmsgsize = 0;
+            return;
+        }
     }
-#pragma GCC diagnostic pop
+    /* Generate the error message... */
+    va_start(args, format);
+    /*
+     * He who has never ignored printf()'s return value, cast the first stone.
+     */
+    vsnprintf(gonsmsg, maxmsgsize, format, args);
     va_end(args);
 }
 
@@ -104,10 +116,10 @@ void gonamespaces(void) {
              */
             int nsref = open(nsenv, O_RDONLY);
             if (nsref < 0) {
-                logerr("gonamespaces: invalid %s reference \"%s\": %s", 
+                logerr("package gons: invalid %s reference \"%s\": %s", 
                     namespaces[nsidx].symname, nsenv,
                     strerror(errno));
-                exit(1);
+                return;
             }
             /*
             * Do not use the glibc version of setns, but go for the syscall
@@ -122,10 +134,11 @@ void gonamespaces(void) {
             * https://dominik.honnef.co/posts/2015/06/statically_compiled_go_programs__always__even_with_cgo__using_musl/
             */
             if (syscall(SYS_setns, nsref, namespaces[nsidx].nstype) < 0) {
-                logerr("gonamespaces: cannot join %s to reference \"%s\": %s", 
+                logerr("package gons: cannot join %s to reference \"%s\": %s", 
                     namespaces[nsidx].symname, nsenv,
                     strerror(errno));
-                exit(1);
+                close(nsref);
+                return;
             }
             /*
              * Release namespace reference fd, as by now our process should

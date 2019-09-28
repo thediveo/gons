@@ -15,13 +15,21 @@
 package gons
 
 import (
+	"io"
+	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-func TestGons(t *testing.T) {
+func TestGonsSuite(t *testing.T) {
+	// If there was a failure in switching namespaces during inital startup,
+	// then report this and end the process with a non-zero status.
+	if err := Status(); err != nil {
+		io.WriteString(os.Stderr, err.Error())
+		os.Exit(1)
+	}
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "gons suite")
 }

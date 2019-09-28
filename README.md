@@ -34,8 +34,8 @@ and must be all lowercase:
 
 > **Note:** if a given namespace path is invalid, or if there are insufficient
 > rights to access the path or switch to the specified namespace, then an
-> error message is printed to stderr and the application aborted with error
-> code 1.
+> error message is stored which you need to pick up later in your application
+> using `gons.Status()`. Please see the package documentation for details.
 
 The `gons` package requires [cgo](https://golang.org/cmd/cgo/): the required
 namespace switches can only safely be done while your application is still

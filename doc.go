@@ -5,13 +5,18 @@
 //
 // Code Usage
 //
-// Simply import the gons package into your application, and you're set.
+// Simply import the gons package into your application, and you're almost
+// set. In your application's main() you should check that there were no
+// errors switching namespaces.
 //
 //   package main
 //
 //   import _ "github.com/thediveo/gons"
 //
 //   func main() {
+//       if err := Status(); err != nil {
+//           panic(err.Error())
+//       }
 //       // ...
 //   }
 //

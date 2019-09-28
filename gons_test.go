@@ -47,7 +47,7 @@ var _ = Describe("gons", func() {
 		ee, ok := err.(*exec.ExitError)
 		Expect(ok).To(BeTrue())
 		Expect(string(ee.Stderr)).To(ContainSubstring(
-			"gonamespaces: invalid netns reference \"/foo\": "))
+			"package gons: invalid netns reference \"/foo\": "))
 	})
 
 	// Reexecute and switch into other namespaces especially created for this
