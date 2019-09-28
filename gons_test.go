@@ -116,7 +116,9 @@ var _ = Describe("gons", func() {
 		}()
 		// Wait for reexeced child to terminate so that we can check for early
 		// child fails while running our test here.
-		go joiner.Wait()
+		go func() { _ = joiner.Wait() }()
+		// Now check the reexeceuted child to use the changed namespaces as we
+		// told it to do...
 		for _, ns := range namespaces {
 			newnsid, err := os.Readlink(fmt.Sprintf(
 				"/proc/%d/ns/%s", sleepy.Process.Pid, ns))

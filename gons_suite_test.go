@@ -29,7 +29,7 @@ func TestGonsSuite(t *testing.T) {
 	// then report this and end the process with a non-zero status. We do this
 	// regardless of whether we're the original test or a reexecuted child.
 	if err := Status(); err != nil {
-		io.WriteString(os.Stderr, err.Error())
+		_, _ = io.WriteString(os.Stderr, err.Error())
 		os.Exit(1)
 	}
 	// There were no namespace switching errors, so we next register this
