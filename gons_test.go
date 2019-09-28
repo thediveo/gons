@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
+	"syscall"
 
 	"github.com/moby/moby/pkg/reexec"
 	. "github.com/onsi/ginkgo"
@@ -48,31 +50,101 @@ var _ = Describe("gons", func() {
 			"gonamespaces: invalid netns reference \"/foo\": "))
 	})
 
+	// Reexecute and switch into other namespaces especially created for this
+	// test.
 	It("switches namespaces when reexecuting", func() {
-		cmd := reexec.Command("reexecutee", "-ginkgo.focus=NOTESTS")
-		out, err := cmd.Output()
-		Expect(err).To(HaveOccurred())
-		ee, ok := err.(*exec.ExitError)
-		Expect(ok).To(BeTrue())
-		Expect(ee.ExitCode()).To(Equal(42))
-		Expect(string(out)).To(ContainSubstring("net:["))
+		// Reexecute ourselves and tell (re)exec to create some new namespaces
+		// for our clone. The purpose of our clone is to just sleep in order
+		// to keep those pesky little namespaces open for as long as we need
+		// them for testing. By creating a new user namespace, we are allowed
+		// to do this without being root, and in consequence, we're also
+		// allowed to create new mount and network namespaces also without
+		// needing root. It's okay that our reexecuted child will be nobody,
+		// so we skip setting up UID and GID mappings.
+		//
+		// As for useful references about using Linux namespaces in Go, please
+		// refer to:
+		// https://medium.com/@teddyking/namespaces-in-go-basics-e3f0fc1ff69a
+		// and
+		// https://medium.com/@teddyking/namespaces-in-go-user-a54ef9476f2a
+		sleepy := reexec.Command("sleepingunbeauty", "-ginkgo.focus=NOTESTS")
+		sleepy.SysProcAttr.Cloneflags =
+			syscall.CLONE_NEWUSER | syscall.CLONE_NEWNS | syscall.CLONE_NEWNET
+		Expect(sleepy.Start()).To(Succeed())
+		// Ensure to terminate the sleeping reexeced child when this test
+		// finishes. The sleeping child should not have exited by itself by
+		// the end of the test, so we consider any issues in killing it a
+		// failure -- that test description rather sounds like a really bad
+		// movie script (SCHLEFAZ, anyone???). Anyway, waiting for the child
+		// to terminate should then be without problems, and here we consider
+		// the child being killed as "no problem". Oh, I just notice there are
+		// a lot of likes by King Herodes and his henchmen.
+		defer func() {
+			Expect(sleepy.Process.Kill()).To(Succeed())
+			err := sleepy.Wait()
+			if exiterr, ok := err.(*exec.ExitError); ok {
+				if !exiterr.Sys().(syscall.WaitStatus).Signaled() {
+					Expect(err).To(Succeed())
+				}
+			} else {
+				Expect(err).To(Succeed())
+			}
+		}()
+		// Now we reexecute another child, but this time we tell it to join
+		// the newly created namespaces and then check to see if it succeeded.
+		// We tell the child which namespaces to join through a set of
+		// environment variables passed to it upon start.
+		joiner := reexec.Command("sleepingunbeauty", "-ginkgo.focus=NOTESTS")
+		joiner.Env = os.Environ()
+		var out strings.Builder
+		joiner.Stdout = &out
+		joiner.Stderr = &out
+		namespaces := []string{"user", "net"}
+		if os.Geteuid() == 0 {
+			namespaces = append(namespaces, "mnt")
+		}
+		for _, ns := range namespaces {
+			joiner.Env = append(joiner.Env,
+				fmt.Sprintf("%sns=/proc/%d/ns/%s",
+					ns, sleepy.Process.Pid, ns))
+		}
+		Expect(joiner.Start()).To(Succeed())
+		// Ensure to terminate the reexeced child under test after we've
+		// passed the main checks.
+		defer func() {
+			Expect(joiner.Process.Kill()).To(Succeed())
+		}()
+		// Wait for reexeced child to terminate so that we can check for early
+		// child fails while running our test here.
+		go joiner.Wait()
+		for _, ns := range namespaces {
+			newnsid, err := os.Readlink(fmt.Sprintf(
+				"/proc/%d/ns/%s", sleepy.Process.Pid, ns))
+			Expect(err).To(Succeed())
+			// Since we might well to early yet the reexecuted child might not
+			// have yet switched its namespaces ... so we need to give it a
+			// little bit of time to settle things. Also, the child might have
+			// terminated already due to fatal failures, so we want to catch
+			// this situation here too.
+			Eventually(func() string {
+				Expect(joiner.ProcessState).To(BeNil(),
+					"reexecuted joiner child terminated prematurely: "+out.String())
+				joinersnsid, err := os.Readlink(fmt.Sprintf(
+					"/proc/%d/ns/%s", joiner.Process.Pid, ns))
+				Expect(err).To(Succeed())
+				return joinersnsid
+			}, "2s", "20ms").Should(Equal(newnsid))
+		}
 	})
 
 })
 
-// Make sure that we have a reexecution handler installed for some of our
-// tests: it will be run inside the reexecuted child, and its output is then
-// checked in the parent running the test cases.
+// Make sure that we have a reexecution handler installed as test helpers.
 func init() {
-	reexec.Register("reexecutee", func() {
-		// Dump all namespace identifiers to allow checks on what really
-		// happened...
-		for _, ns := range []string{"cgroup", "ipc", "mnt", "net", "pid", "user", "uts"} {
-			if nsref, err := os.Readlink(fmt.Sprintf("/proc/self/ns/%s", ns)); err == nil {
-				fmt.Printf("%s\n", nsref)
-			}
-		}
-		os.Exit(42)
+	reexec.Register("sleepingunbeauty", func() {
+		// Just keep this reexecuted child sleeping; we will be killed by our
+		// parent when the test is done. What a lovely family.
+		select {}
 	})
 	// Ensure that the registered handler is run in the reexecuted child. This
 	// won't trigger the handler while we're in the parent, because the
