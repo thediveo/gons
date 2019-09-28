@@ -53,6 +53,9 @@ var _ = Describe("gons", func() {
 	// Reexecute and switch into other namespaces especially created for this
 	// test.
 	It("switches namespaces when reexecuting", func() {
+		if os.Geteuid() != 0 {
+			Skip("needs root")
+		}
 		// Reexecute ourselves and tell (re)exec to create some new namespaces
 		// for our clone. The purpose of our clone is to just sleep in order
 		// to keep those pesky little namespaces open for as long as we need
@@ -99,10 +102,7 @@ var _ = Describe("gons", func() {
 		var out strings.Builder
 		joiner.Stdout = &out
 		joiner.Stderr = &out
-		namespaces := []string{"user", "net"}
-		if os.Geteuid() == 0 {
-			namespaces = append(namespaces, "mnt")
-		}
+		namespaces := []string{"user", "mnt", "net"}
 		for _, ns := range namespaces {
 			joiner.Env = append(joiner.Env,
 				fmt.Sprintf("%sns=/proc/%d/ns/%s",
