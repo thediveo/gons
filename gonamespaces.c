@@ -46,8 +46,10 @@
 
 /* Describes a specific type of Linux kernel namespace supported by gons. */
 struct ns_t {
-    char *symname; /* namespace symbolic name, such as "mnt", "net", et cetera. */
-    int nstype; /* CLONE_NEWxxx constant for this type of namespace. */
+    char *envvarname; /* name of env variable for this type of namespace */
+    int   nstype;     /* CLONE_NEWxxx constant for this type of namespace. */
+    char *path;       /* reference to a namespace in the currently mounted filesystem */
+    int   fd;         /* optional fd referencing a namespace, if path==NULL */
 };
 
 /*
@@ -55,15 +57,22 @@ struct ns_t {
  * the Go runtime spins up. Please note that setting the PID namespace will
  * never apply to us, but only to our children.
  */
-static const struct ns_t namespaces[] = {
-    { "cgroupns", CLONE_NEWCGROUP },
-    { "ipcns", CLONE_NEWIPC },
-    { "mntns", CLONE_NEWNS },
-    { "netns", CLONE_NEWNET },
-    { "pidns", CLONE_NEWPID },
-    { "userns", CLONE_NEWUSER },
-    { "utsns", CLONE_NEWUTS }
+static struct ns_t namespaces[] = {
+    { "gons_cgroup", CLONE_NEWCGROUP, NULL, -1 },
+    { "gons_ipc", CLONE_NEWIPC, NULL, -1 },
+    { "gons_mnt", CLONE_NEWNS, NULL, -1 },
+    { "gons_net", CLONE_NEWNET, NULL, -1 },
+    { "gons_pid", CLONE_NEWPID, NULL, -1 },
+    { "gons_user", CLONE_NEWUSER, NULL, -1 },
+    { "gons_uts", CLONE_NEWUTS, NULL, -1 }
 };
+
+/* Number of namespace (types) */
+#define NSCOUNT (sizeof(namespaces) / sizeof(namespaces[0]))
+
+/* Default order if no order has been given ;) */
+static char *defaultorder =
+    "!user,!mnt,!cgroup,!ipc,!net,!pid,!uts";
 
 /*
  * If not NULL, then points to a buffer with an error message for later
@@ -107,45 +116,112 @@ static void logerr(const char *format, ...) {
  * the set of Linux namespaces supported.
  */
 void gonamespaces(void) {
-    for (int nsidx = 0; nsidx < sizeof(namespaces) / sizeof(namespaces[0]); ++nsidx) {
-        char *nsenv = getenv(namespaces[nsidx].symname);
-        if (nsenv != NULL && *nsenv != '\0') {
-            /*
-             * There's an env var specified for this namespace, and it should
-             * reference a namespace of this type in the filesystem...
-             */
-            int nsref = open(nsenv, O_RDONLY);
+    // Find out whether we should keep some ooooorder ;) The order describes
+    // the sequence in which the namespaces should be entered whether the
+    // paths are resolved into fds before the first setns(), or as the setns()
+    // happen.
+    int seq[NSCOUNT]; // indices into namespaces array
+    int seqlen = 0;
+    char *ooorder = getenv("gons_order");
+    // In case no order has been given, then we will employ our default order.
+    if (ooorder == NULL || !*ooorder) ooorder = defaultorder;
+    // Remember: the environment is not ours ;) (...to write into)
+    ooorder = strdup(ooorder);
+    while (*ooorder && seqlen < NSCOUNT) {
+        int fdref = *ooorder == '!';
+        if (fdref) ++ooorder;
+        char *delimiter = strchr(ooorder, ',');
+        if (delimiter != NULL) *delimiter++ = '\0';
+        // Find the corresponding type element in the namespaces array by name.
+        // Please note that we skip the "gons_" prefix in the namespaces
+        // definition above.
+        int nsidx;
+        for (nsidx = 0; nsidx < NSCOUNT; ++nsidx) {
+            if (!strcmp(ooorder, namespaces[nsidx].envvarname+5)) {
+                break;
+            }
+        }
+        if (nsidx >= NSCOUNT) {
+            logerr("package gons: unknown namespace type \"%s\" in gons_order",
+                   ooorder);
+            return;
+        }
+        // Get the corresponding filesystem path reference for this namespace.
+        // If not set, then skip this sequence element.
+        char *envvar = getenv(namespaces[nsidx].envvarname);
+        if (envvar && *envvar) {
+            // If the namespace should be entered using an fd-reference opened
+            // before the first setns(), then open the fd now. Otherwise just
+            // use the path later.
+            if (fdref) {
+                if (namespaces[nsidx].fd >= 0) {
+                    logerr("package gons: duplicate namespace order type %s",
+                           ooorder);
+                    return;
+                }
+                int nsref = open(envvar, O_RDONLY);
+                if (nsref < 0) {
+                    logerr("package gons: invalid %s reference \"%s\": %s", 
+                        namespaces[nsidx].envvarname, envvar,
+                        strerror(errno));
+                    return;
+                }
+                namespaces[nsidx].fd = nsref;
+            }
+            if (namespaces[nsidx].path) {
+                logerr("package gons: duplicate namespace order type %s",
+                       ooorder);
+                return;
+            }
+            namespaces[nsidx].path = envvar;
+            seq[seqlen] = nsidx;
+            ++seqlen;
+        }
+        // If we had a delimiter, then it will by now already point past it,
+        // thus to the next element in the sequence. If there wasn't a
+        // delimiter, then we simple fast forward to the \0 after the last
+        // element, so the loop will terminate.
+        if (delimiter) {
+            ooorder = delimiter;
+        } else {
+            ooorder += strlen(ooorder);
+        }
+    }
+    // Now run through the namespace switch sequence and try to let things
+    // happen...
+    for (int seqidx = 0; seqidx < seqlen; ++seqidx) {
+        int nsidx = seq[seqidx];
+        int nsref = namespaces[nsidx].fd;
+        // If there isn't a pre-opened fd for this namespace to switch into,
+        // then we now need to open its reference.
+        if (nsref < 0) {
+            nsref = open(namespaces[nsidx].path, O_RDONLY);
             if (nsref < 0) {
                 logerr("package gons: invalid %s reference \"%s\": %s", 
-                    namespaces[nsidx].symname, nsenv,
+                    namespaces[nsidx].envvarname, namespaces[nsidx].path,
                     strerror(errno));
                 return;
             }
-            /*
-            * Do not use the glibc version of setns, but go for the syscall
-            * itself. This allows us to avoid dynamically linking to glibc
-            * even when using cgo, resorting to musl, et cetera. As musl is a
-            * mixed bag in terms of its glibc compatibility, especially in
-            * such dark corners as Linux namespaces, we try to minimize
-            * problematic dependencies here.
-            *
-            * A useful reference is Dominik Honnef's blog post "Statically
-            * compiled Go programs, always, even with cgo, using musl":
-            * https://dominik.honnef.co/posts/2015/06/statically_compiled_go_programs__always__even_with_cgo__using_musl/
-            */
-            if (syscall(SYS_setns, nsref, namespaces[nsidx].nstype) < 0) {
-                logerr("package gons: cannot join %s using reference \"%s\": %s", 
-                    namespaces[nsidx].symname, nsenv,
-                    strerror(errno));
-                close(nsref);
-                return;
-            }
-            /*
-             * Release namespace reference fd, as by now our process should
-             * reference the namespace by itself (unless there was an error),
-             * and we don't want such open fds lying around anyway.
-             */
-            close(nsref);
+        }
+        /*
+        * Do not use the glibc version of setns, but go for the syscall
+        * itself. This allows us to avoid dynamically linking to glibc
+        * even when using cgo, resorting to musl, et cetera. As musl is a
+        * mixed bag in terms of its glibc compatibility, especially in
+        * such dark corners as Linux namespaces, we try to minimize
+        * problematic dependencies here.
+        *
+        * A useful reference is Dominik Honnef's blog post "Statically
+        * compiled Go programs, always, even with cgo, using musl":
+        * https://dominik.honnef.co/posts/2015/06/statically_compiled_go_programs__always__even_with_cgo__using_musl/
+        */
+        long res = syscall(SYS_setns, nsref, namespaces[nsidx].nstype);
+        close(nsref); /* Don't leak file descriptors */
+        if (res < 0) {
+            logerr("package gons: cannot join %s using reference \"%s\": %s", 
+                namespaces[nsidx].envvarname, namespaces[nsidx].path,
+                strerror(errno));
+            return;
         }
     }
 }

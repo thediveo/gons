@@ -41,13 +41,13 @@ var _ = Describe("gons", func() {
 	It("aborts reexecution for invalid namespace reference", func() {
 		cmd := reexec.Command("foo", "-ginkgo.focus=NOTESTS")
 		cmd.Env = os.Environ()
-		cmd.Env = append(cmd.Env, "netns=/foo")
+		cmd.Env = append(cmd.Env, "gons_net=/foo")
 		_, err := cmd.Output()
 		Expect(err).To(HaveOccurred())
 		ee, ok := err.(*exec.ExitError)
 		Expect(ok).To(BeTrue())
 		Expect(string(ee.Stderr)).To(ContainSubstring(
-			"package gons: invalid netns reference \"/foo\": "))
+			"package gons: invalid gons_net reference \"/foo\": "))
 	})
 
 	// Reexecute and switch into other namespaces especially created for this
@@ -105,7 +105,7 @@ var _ = Describe("gons", func() {
 		namespaces := []string{"user", "mnt", "net"}
 		for _, ns := range namespaces {
 			joiner.Env = append(joiner.Env,
-				fmt.Sprintf("%sns=/proc/%d/ns/%s",
+				fmt.Sprintf("gons_%s=/proc/%d/ns/%s",
 					ns, sleepy.Process.Pid, ns))
 		}
 		Expect(joiner.Start()).To(Succeed())
