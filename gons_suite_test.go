@@ -25,7 +25,7 @@ import (
 )
 
 func TestGonsSuite(t *testing.T) {
-	// If there was a failure in switching namespaces during inital startup,
+	// If there was a failure in switching namespaces during initial startup,
 	// then report this and end the process with a non-zero status. We do this
 	// regardless of whether we're the original test or a reexecuted child.
 	if err := Status(); err != nil {

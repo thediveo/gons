@@ -1,6 +1,8 @@
 # gons
 
 [![GoDoc](https://godoc.org/github.com/TheDiveO/gons?status.svg)](http://godoc.org/github.com/TheDiveO/gons)
+[![GitHub](https://img.shields.io/github/license/thediveo/gons)](https://img.shields.io/github/license/thediveo/gons)
+[![Go Report Card](https://goreportcard.com/badge/github.com/thediveo/gons)](https://goreportcard.com/report/github.com/thediveo/gons)
 
 `gons` ("go [*into*] namespaces") is a small Go package that selectively
 switches your Go application into other already existing Linux namespaces.
