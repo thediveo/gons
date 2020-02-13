@@ -25,7 +25,7 @@ import (
 	"github.com/thediveo/gons/reexec"
 )
 
-func TestGonsSuite(t *testing.T) {
+func TestMain(m *testing.M) {
 	// If there was a failure in switching namespaces during initial startup,
 	// then report this and end the process with a non-zero status. We do this
 	// regardless of whether we're the original test or a re-executed child.
@@ -48,8 +48,12 @@ func TestGonsSuite(t *testing.T) {
 	// won't trigger the handler while we're in the parent, because the
 	// parent's Arg[0] won't match the name of our handler.
 	reexec.CheckAction()
+	os.Exit(m.Run())
+}
+
+func TestPackage(t *testing.T) {
 	// Okay, we're a real test suite, and there was no re-executed child
 	// handler triggering... :)
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "gons suite")
+	RunSpecs(t, "gons package")
 }

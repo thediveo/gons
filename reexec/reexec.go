@@ -105,9 +105,9 @@ func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (
 	// switches.
 	ooorder := []string{} // cSpell:ignore ooorder
 	for _, ns := range namespaces {
-		ooorder = append(ooorder, strings.TrimPrefix(ns.Type, "!"))
+		ooorder = append(ooorder, ns.Type)
 		forkchild.Env = append(forkchild.Env,
-			fmt.Sprintf("gons_%s=%s", ns.Type, ns.Path))
+			fmt.Sprintf("gons_%s=%s", strings.TrimPrefix(ns.Type, "!"), ns.Path))
 	}
 	forkchild.Env = append(forkchild.Env, "gons_order="+strings.Join(ooorder, ","))
 	// Finally set the action to run on restarting our fork, and then try to

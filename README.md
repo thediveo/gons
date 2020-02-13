@@ -4,6 +4,8 @@
 [![GitHub](https://img.shields.io/github/license/thediveo/gons)](https://img.shields.io/github/license/thediveo/gons)
 [![Go Report Card](https://goreportcard.com/badge/github.com/thediveo/gons)](https://goreportcard.com/report/github.com/thediveo/gons)
 
+## gons
+
 `gons` ("go [*into*] namespaces") is a small Go package that selectively
 switches your Go application into other already existing Linux namespaces.
 This must happen before the Go runtime spins up, blocking certain namespace
@@ -60,6 +62,14 @@ switched, as well as when the namespace paths are to be opened:
 The `gons` package requires [cgo](https://golang.org/cmd/cgo/): the required
 namespace switches can only safely be done while your application is still
 single-threaded and that's only the case before the Go runtime is spinning up.
+
+## gons/reexec
+
+`gons/reexec` helps with forking and re-executing an application in order to
+switch namespaces, run some action, sending back intelligence to the parent
+application process, and then terminating the re-executed child. The parent
+process (or rather: go routine) then continues, working on the intelligence
+gathered.
 
 ## Copyright and License
 
