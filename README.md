@@ -38,12 +38,14 @@ and must be all lowercase:
 
 Additionally, you can specify the order in which the namespaces should be
 switched, as well as when the namespace paths are to be opened:
-- if not overriden by the optional environment variable `gons_order=...`, then
-  the default order is `!user,!mnt,!cgroup,!ipc,!net,!pid,!uts` (see below for
-  the meaning of "`!`"). It's not necessary to specify all 7 namespace types
-  when you don't intend to switch them all. For instance, if you just switch
-  the net and IPC namespaces, then `gons_order=net,ipc` is sufficient.
-- when a namespace type name is preceeded by a bang "`!`", such as `!user`,
+
+- if not overridden by the optional environment variable `gons_order=...`,
+  then the default order is `!user,!mnt,!cgroup,!ipc,!net,!pid,!uts` (see
+  below for the meaning of "`!`"). It's not necessary to specify all 7
+  namespace types when you don't intend to switch them all. For instance, if
+  you just switch the net and IPC namespaces, then `gons_order=net,ipc` is
+  sufficient.
+- when a namespace type name is preceded by a bang "`!`", such as `!user`,
   then the its path will be opened before the first namespace switch takes
   place. Without a bang, the namespace path is opened just right before
   switching into this namespace. This is mostly of importance when switching

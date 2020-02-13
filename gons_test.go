@@ -30,15 +30,15 @@ var _ = Describe("gons", func() {
 
 	// Basic self-check that reexecution is working and doesn't trigger an
 	// infinite loop.
-	It("reexecutes itself", func() {
+	It("re-executes itself", func() {
 		cmd := reexec.Command("foo", "-ginkgo.focus=NOTESTS")
 		out, err := cmd.Output()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(out)).To(ContainSubstring("Running Suite: gons suite"))
 	})
 
-	// Reexecute with an invalid namespace reference.
-	It("aborts reexecution for invalid namespace reference", func() {
+	// Re-execute with an invalid namespace reference.
+	It("aborts re-execution for invalid namespace reference", func() {
 		cmd := reexec.Command("foo", "-ginkgo.focus=NOTESTS")
 		cmd.Env = os.Environ()
 		cmd.Env = append(cmd.Env, "gons_net=/foo")
@@ -50,19 +50,19 @@ var _ = Describe("gons", func() {
 			"package gons: invalid gons_net reference \"/foo\": "))
 	})
 
-	// Reexecute and switch into other namespaces especially created for this
+	// Re-execute and switch into other namespaces especially created for this
 	// test.
-	It("switches namespaces when reexecuting", func() {
+	It("switches namespaces when re-executing", func() {
 		if os.Geteuid() != 0 {
 			Skip("needs root")
 		}
-		// Reexecute ourselves and tell (re)exec to create some new namespaces
+		// Re-execute ourselves and tell (re)exec to create some new namespaces
 		// for our clone. The purpose of our clone is to just sleep in order
 		// to keep those pesky little namespaces open for as long as we need
 		// them for testing. By creating a new user namespace, we are allowed
 		// to do this without being root, and in consequence, we're also
 		// allowed to create new mount and network namespaces also without
-		// needing root. It's okay that our reexecuted child will be nobody,
+		// needing root. It's okay that our re-executed child will be nobody,
 		// so we skip setting up UID and GID mappings.
 		//
 		// As for useful references about using Linux namespaces in Go, please
@@ -74,7 +74,7 @@ var _ = Describe("gons", func() {
 		sleepy.SysProcAttr.Cloneflags =
 			syscall.CLONE_NEWUSER | syscall.CLONE_NEWNS | syscall.CLONE_NEWNET
 		Expect(sleepy.Start()).To(Succeed())
-		// Ensure to terminate the sleeping reexeced child when this test
+		// Ensure to terminate the sleeping re-execed child when this test
 		// finishes. The sleeping child should not have exited by itself by
 		// the end of the test, so we consider any issues in killing it a
 		// failure -- that test description rather sounds like a really bad
@@ -93,7 +93,7 @@ var _ = Describe("gons", func() {
 				Expect(err).To(Succeed())
 			}
 		}()
-		// Now we reexecute another child, but this time we tell it to join
+		// Now we re-execute another child, but this time we tell it to join
 		// the newly created namespaces and then check to see if it succeeded.
 		// We tell the child which namespaces to join through a set of
 		// environment variables passed to it upon start.
@@ -109,7 +109,7 @@ var _ = Describe("gons", func() {
 					ns, sleepy.Process.Pid, ns))
 		}
 		Expect(joiner.Start()).To(Succeed())
-		// Ensure to terminate the reexeced child under test after we've
+		// Ensure to terminate the re-executed child under test after we've
 		// passed the main checks.
 		defer func() {
 			Expect(joiner.Process.Kill()).To(Succeed())
