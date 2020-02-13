@@ -25,17 +25,20 @@ import (
 
 func init() {
 	Register("action", func() {
-		fmt.Fprint(os.Stdout, `"done"`)
+		fmt.Fprintln(os.Stdout, `"done"`)
 	})
 	Register("sleepy", func() {
-		fmt.Fprint(os.Stdout, `"sleeping"`)
+		fmt.Fprintln(os.Stdout, `"sleeping"`)
 		// Just keep this re-executed child action sleeping; we will be killed
 		// by our parent when the test is done. What a lovely family.
 		select {}
 	})
 	Register("unintelligible", func() {
 		// Return something the parent process didn't expect.
-		println(42)
+		fmt.Fprintln(os.Stdout, `42`)
+	})
+	Register("reexec", func() {
+		_ = ForkReexec("reexec", []Namespace{}, nil)
 	})
 }
 
@@ -52,28 +55,51 @@ var _ = Describe("reexec", func() {
 		Expect(func() { Register("foo", func() {}) }).To(Panic())
 	})
 
-	It("doesn't run the child for a non-preregistered action", func() {
+	It("panics the child for a non-preregistered action", func() {
 		// Note how registering the bar action here will cause the re-executed
 		// package test child to fail, because this will trigger CheckAction()
 		// without the bar action being registered early enough in the child.
 		Expect(func() { Register("bar", func() {}) }).NotTo(Panic())
 		Expect(ForkReexec("bar", []Namespace{}, nil)).To(
-			MatchError(MatchRegexp(`ForkReexec: child failed:`)))
+			MatchError(MatchRegexp(`ForkReexec: child failed: .* unregistered .* action`)))
 	})
 
-	FIt("terminates a hanging re-executed child", func() {
+	It("panics the child for invalid namespace", func() {
+		// Note that it is not possible to re-enter the current user
+		// namespace, because that would otherwise give us full privileges. We
+		// use this to check that the re-executed child correctly panics when
+		// there are problems entering namespaces.
+		Expect(ForkReexec("action", []Namespace{
+			{Type: "user", Path: "/proc/self/ns/user"},
+		}, nil)).To(MatchError(MatchRegexp(`ForkReexec: child failed: .* cannot join`)))
+	})
+
+	It("doesn't re-execute from a re-executed child", func() {
+		Expect(ForkReexec("reexec", []Namespace{}, nil)).To(
+			MatchError(MatchRegexp(`ForkReexec: child failed: .* tried to re-execute`)))
+	})
+
+	It("panics on un-decodable child result", func() {
+		var s string
+		Expect(ForkReexec("unintelligible", []Namespace{}, &s)).To(
+			MatchError(MatchRegexp(`ForkReexec: cannot decode child result`)))
+	})
+
+	It("terminates a hanging re-executed child", func() {
 		var s string
 		done := make(chan error)
 		go func() {
-			Expect(ForkReexec("sleepy", []Namespace{}, &s)).ToNot(HaveOccurred())
-			Expect(s).To(Equal("sleeping"))
+			defer GinkgoRecover()
 			done <- nil
+			select {
+			case <-time.After(5 * time.Second):
+				Fail("ForkReexec failed to terminate sleeping re-executed child in time")
+			case <-done:
+			}
 		}()
-		select {
-		case <-time.After(5 * time.Second):
-			Fail("ForkReexec failed to terminate sleeping re-executed child in time")
-		case <-done:
-		}
+		//
+		Expect(ForkReexec("sleepy", []Namespace{}, &s)).ToNot(HaveOccurred())
+		Expect(s).To(Equal("sleeping"))
 	})
 
 })
