@@ -8,5 +8,35 @@ mount namespaces. The go runtime spins up multiple threads, but Linux really
 doesn't like changing mount namespaces when a process has become
 multi-threaded.
 
+Example
+
+The following example code registers an action called "action" to be run when
+forking and re-executing the example process. As early as possible in main()
+we check for a pending action using CheckAction(). It will either execute an
+action and then terminate the process, or return control flow in order to run
+the process as usual.
+
+The registered example action simply prints its result to os.Stdout and then
+returns, which immediately terminates the re-executed process. This result is
+returned to the parent process which initiated the re-execution.
+
+  import (
+      "fmt"
+      "os"
+      "github.com/thediveo/gons/reexec"
+  }
+
+  func init() {
+      reexec.Register("action", func() {
+        fmt.Fprintln(os.Stdout, `"done"`)
+      })
+  }
+
+  func main() {
+      reexec.CheckAction()
+      var result string
+      _ = reexec.ForkReexec("action", []reexec.Namespace{}, &result)
+  }
+
 */
 package reexec
