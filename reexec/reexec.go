@@ -43,12 +43,45 @@ const magicEnvVar = "gons_reexec_action"
 // This is a safeguard measure to cause havoc by unexpected clone restarts.
 var reexecEnabled = false
 
+// testingEnabled is set to true when coverage profile data should be gathered
+// for re-executed child processes.
+var coverageEnabled = false
+
+// FIXME: doc
+var coverageOutputDir = ""
+
+// FIXME: doc
+var coverageProfile = ""
+
+// EnableCoverage is a module-internal function for use by the reexec/testing
+// package; it enables passing coverage-related test parameters to re-executed
+// child processes, as well as allocating coverage profile data filenames for
+// them.
+func EnableCoverage(outputdir, coverprofile string) {
+	coverageEnabled = true
+	coverageOutputDir = outputdir
+	coverageProfile = coverprofile
+}
+
+// coverageProfiles is a list of coverage profile data filenames for
+// re-executed child processes.
+var coverageProfiles = []string{}
+
+// FIXME: doc
+func ReexecCoverageProfiles() []string { return coverageProfiles }
+
 // CheckAction checks if an application using reexec has been forked and
 // re-executed in order to switch namespaces in the clone. If we're in a
 // re-execution, then this function won't return, but instead run the
 // scheduled reexec functionality. Please do not confuse re-execution with
 // royalists and round-heads.
 func CheckAction() {
+	if checkAction() {
+		os.Exit(0)
+	}
+}
+
+func checkAction() (action bool) {
 	// Did we had a problem during reentry...?
 	if err := gons.Status(); err != nil {
 		panic(err)
@@ -61,11 +94,12 @@ func CheckAction() {
 			panic(fmt.Sprintf("unregistered gons/reexec re-execution action %q", actionname))
 		}
 		action()
-		os.Exit(0)
+		return true
 	}
 	// Enable fork/re-execution only for the parent process of the application
 	// using reexec, but not in the re-executed child.
 	reexecEnabled = true
+	return
 }
 
 // Namespace describes a Linux kernel namespace into which a forked and
@@ -95,9 +129,20 @@ func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (
 		}
 		panic("gons/reexec: ForkReexec: tried to re-execute in already re-executed child process")
 	}
+	// If coverage of re-excutions has been enabled, then make sure to pass
+	// the necessary parameters on to our child processes. For each child we
+	// allocate a separate child coverage profile data file, which we will
+	// have to merge later with our main coverage profile of this process.
+	testargs := []string{}
+	if coverageEnabled {
+		testargs = append(testargs, "-test.outputdir="+coverageOutputDir)
+		name := coverageProfile + fmt.Sprintf("_%d", len(coverageProfiles))
+		coverageProfiles = append(coverageProfiles, name)
+		testargs = append(testargs, "-test.coverprofile="+name)
+	}
 	// Prepare a fork/re-execution of ourselves, which then switches itself
 	// into the required namespace(s) before its go runtime spins up.
-	forkchild := exec.Command("/proc/self/exe")
+	forkchild := exec.Command("/proc/self/exe", testargs...)
 	forkchild.Env = os.Environ()
 	// Pass the namespaces the fork/child should switch into via the
 	// soon-to-be child's environment. The sequence of the namespaces slice is
