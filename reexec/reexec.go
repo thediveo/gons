@@ -29,7 +29,7 @@ import (
 	gons "github.com/thediveo/gons"
 )
 
-// magicEnvVar is the name of the environment variable, which triggers a
+// magicEnvVar defines the name of the environment variable which triggers a
 // specific registered action to be run when an application using the reexec
 // package forks and restarts itself, typically to switch into different
 // namespaces.
@@ -43,9 +43,9 @@ const magicEnvVar = "gons_reexec_action"
 // This is a safeguard measure to cause havoc by unexpected clone restarts.
 var reexecEnabled = false
 
-// testingEnabled is set to true when coverage profile data should be gathered
-// for re-executed child processes.
-var coverageEnabled = false
+// testingEnabled is set to true when we're under testing; gathering coverage
+// profile data might be enabled.
+var testingEnabled = false
 
 // FIXME: doc
 var coverageOutputDir = ""
@@ -53,12 +53,12 @@ var coverageOutputDir = ""
 // FIXME: doc
 var coverageProfile = ""
 
-// EnableCoverage is a module-internal function for use by the reexec/testing
-// package; it enables passing coverage-related test parameters to re-executed
-// child processes, as well as allocating coverage profile data filenames for
-// them.
-func EnableCoverage(outputdir, coverprofile string) {
-	coverageEnabled = true
+// EnableTesting is a module-internal function for use by the
+// gons/reexec/testing package; it enables passing coverage-related test
+// parameters to re-executed child processes, as well as allocating coverage
+// profile data filenames for them.
+func EnableTesting(outputdir, coverprofile string) {
+	testingEnabled = true
 	coverageOutputDir = outputdir
 	coverageProfile = coverprofile
 }
@@ -67,7 +67,9 @@ func EnableCoverage(outputdir, coverprofile string) {
 // re-executed child processes.
 var coverageProfiles = []string{}
 
-// FIXME: doc
+// ReexecCoverageProfiles is a cross-package internal function, returning the
+// list of coverage profile data filenames created by re-executed child
+// processes. This information is consumed by the gons/reexec/testing package.
 func ReexecCoverageProfiles() []string { return coverageProfiles }
 
 // CheckAction checks if an application using reexec has been forked and
@@ -76,12 +78,17 @@ func ReexecCoverageProfiles() []string { return coverageProfiles }
 // scheduled reexec functionality. Please do not confuse re-execution with
 // royalists and round-heads.
 func CheckAction() {
-	if checkAction() {
+	if RunAction() {
 		os.Exit(0)
 	}
 }
 
-func checkAction() (action bool) {
+// RunAction checks if an application using the gons/reexec package has been
+// forked and re-executed as a copy of itself. If this is the case, then the
+// action specified for re-execution is run, and true returned. If this isn't
+// the case, because this is the parent process and not a re-executed child,
+// then no action is run, and false returned instead.
+func RunAction() (action bool) {
 	// Did we had a problem during reentry...?
 	if err := gons.Status(); err != nil {
 		panic(err)
@@ -129,16 +136,35 @@ func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (
 		}
 		panic("gons/reexec: ForkReexec: tried to re-execute in already re-executed child process")
 	}
-	// If coverage of re-excutions has been enabled, then make sure to pass
-	// the necessary parameters on to our child processes. For each child we
-	// allocate a separate child coverage profile data file, which we will
-	// have to merge later with our main coverage profile of this process.
+	if _, ok := actions[actionname]; !ok {
+		panic("gons/reexec: ForkReexec: attempting to re-execute into unregistered action \"" +
+			actionname + "\"")
+	}
+	// If testing has been enabled, then make sure to pass the necessary
+	// parameters on to our child processes, as it will (have to) use a
+	// TestMain and our "enhanced" gons.reexec.testing.M. For each child we
+	// allocate a separate child coverage profile data files, if necessary,
+	// which we will have to merge later with our main coverage profile of
+	// this process. And finally, we need to run tests, as otherwise no
+	// coverage profile data would be written, but we make sure to achieve an
+	// empty set of tests to be run.
 	testargs := []string{}
-	if coverageEnabled {
-		testargs = append(testargs, "-test.outputdir="+coverageOutputDir)
-		name := coverageProfile + fmt.Sprintf("_%d", len(coverageProfiles))
-		coverageProfiles = append(coverageProfiles, name)
-		testargs = append(testargs, "-test.coverprofile="+name)
+	if testingEnabled {
+		if coverageProfile != "" {
+			name := coverageProfile + fmt.Sprintf("_%d", len(coverageProfiles))
+			coverageProfiles = append(coverageProfiles, name)
+			if coverageProfile != "" {
+				testargs = append(testargs,
+					"-test.coverprofile="+name)
+			}
+			if coverageOutputDir != "" {
+				testargs = append(testargs,
+					"-test.outputdir="+coverageOutputDir)
+			}
+		}
+		testargs = append(testargs,
+			"-test.run=nadazilchnixdairgendwoimnirvanavonjottwehdeh",
+		)
 	}
 	// Prepare a fork/re-execution of ourselves, which then switches itself
 	// into the required namespace(s) before its go runtime spins up.
@@ -188,7 +214,7 @@ func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (
 	// result decoder encounters due to the child's problems.
 	childhiccup := childerr.String()
 	if childhiccup != "" {
-		return fmt.Errorf("gons/reexec: ForkReexec: child failed: %q", childhiccup)
+		return fmt.Errorf("gons/reexec: ForkReexec: child failed with stderr message: %q", childhiccup)
 	}
 	if decodererr != nil {
 		return fmt.Errorf("gons/reexec: ForkReexec: cannot decode child result, %q",

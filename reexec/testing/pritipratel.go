@@ -20,23 +20,25 @@ import (
 	"strings"
 )
 
-// noUglyTruthsToStdout runs function f and passes all output destined to
-// os.Stdout to os.Stdout, unless it happens to be some testing-related
-// message, which we silently drop. This is necessary as some applications
+// pritiPratel runs function f and passes only harmless error output destined
+// to os.Stderr really on to os.Stderr. All dangerous talk about unwanted
+// error truths will be sent into early retirement. Such as testing-related
+// messages, which we silently drop. This is necessary as some applications
 // using gons/reexec expect the re-executed child to return their results via
-// stdout, so Golang's testing output must not interfere here.
-func noUglyTruthsToStdout(f func()) {
-	realStdout := os.Stdout
+// stdout without any stderr output, so we don't want Golang's testing output
+// to interfere here.
+func pritiPratel(f func()) {
+	realStderr := os.Stderr
 	// Unfortunately, we cannot make use of the in-memory io.Pipe()s here, as
-	// os.Stdout is a *os.File, so it needs to have a file descriptor. In
+	// os.Stderr is a *os.File, so it needs to have a file descriptor. In
 	// consequence, that leaves us with the sole option of a "real" pipe.
 	reader, writer, err := os.Pipe()
 	if err != nil {
 		panic("gons/reexec/testing: cannot create filtering pipe: " + err.Error())
 	}
-	os.Stdout = writer
+	os.Stderr = writer
 	defer func() {
-		os.Stdout = realStdout
+		os.Stderr = realStderr
 		reader.Close()
 		writer.Close()
 	}()
@@ -77,7 +79,7 @@ func noUglyTruthsToStdout(f func()) {
 				continue
 			}
 			// It's output we should better pass on...
-			if _, err := realStdout.Write(line); err != nil {
+			if _, err := realStderr.Write(line); err != nil {
 				close(done)
 				return
 			}
@@ -87,7 +89,7 @@ func noUglyTruthsToStdout(f func()) {
 					close(done)
 					return
 				}
-				if _, err := realStdout.Write(line); err != nil {
+				if _, err := realStderr.Write(line); err != nil {
 					close(done)
 					return
 				}
@@ -100,7 +102,7 @@ func noUglyTruthsToStdout(f func()) {
 				return
 			}
 			if b, err := r.ReadByte(); err == nil && b == '\n' {
-				if _, err := realStdout.Write([]byte{'\n'}); err != nil {
+				if _, err := realStderr.Write([]byte{'\n'}); err != nil {
 					close(done)
 					return
 				}

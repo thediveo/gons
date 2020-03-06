@@ -23,16 +23,16 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// While running function f(), captures f's output to stdout.and returns it.
-func capturestdout(f func()) (stdout string) {
-	origStdout := os.Stdout
+// While running function f(), captures f's output to stderr.and returns it.
+func capturestdout(f func()) (stderr string) {
+	origStderr := os.Stderr
 	r, w, _ := os.Pipe()
 	defer func() {
-		os.Stdout = origStdout
+		os.Stderr = origStderr
 		r.Close()
 		w.Close()
 	}()
-	os.Stdout = w
+	os.Stderr = w
 	// Run function f() only on this thread, as Gomego doesn't like it
 	// otherwise. So we have to run the Stdout replacement pipe reader on a
 	// separate go routine. When it has read all that was in the pipe, it will
@@ -40,41 +40,41 @@ func capturestdout(f func()) (stdout string) {
 	done := make(chan struct{})
 	go func() {
 		b, _ := ioutil.ReadAll(r)
-		stdout = string(b)
+		stderr = string(b)
 		close(done)
 	}()
 	f()
 	// Shut down the writer end, so the pipe reader knows that capturing
-	// stdout is finished, and can retrieve the complete captured output. We
+	// stderr is finished, and can retrieve the complete captured output. We
 	// wait for the pipe reader to be finally done before returning.
 	w.Close()
 	<-done
 	return
 }
 
-var _ = Describe("stdout processing", func() {
+var _ = Describe("stderr processing", func() {
 
 	It("passes test harness self-test", func() {
-		Expect(capturestdout(func() { fmt.Print("foo") })).To(Equal("foo"))
+		Expect(capturestdout(func() { fmt.Fprint(os.Stderr, "foo") })).To(Equal("foo"))
 	})
 
 	It("correctly passes on normal output", func() {
 		Expect(capturestdout(func() {
-			noUglyTruthsToStdout(func() {
-				fmt.Print("some test")
+			pritiPratel(func() {
+				fmt.Fprint(os.Stderr, "some test")
 			})
 		})).To(Equal("some test"))
 		Expect(capturestdout(func() {
-			noUglyTruthsToStdout(func() {
-				fmt.Print("coverage is meh\ntest\n")
+			pritiPratel(func() {
+				fmt.Fprint(os.Stderr, "coverage is meh\ntest\n")
 			})
 		})).To(Equal("coverage is meh\ntest\n"))
 	})
 
 	It("hides unwanted truths about coverage: and testing:", func() {
 		Expect(capturestdout(func() {
-			noUglyTruthsToStdout(func() {
-				fmt.Print("some test\ncoverage: foo\nbar\ntesting: foo\nbar")
+			pritiPratel(func() {
+				fmt.Fprint(os.Stderr, "some test\ncoverage: foo\nbar\ntesting: foo\nbar")
 			})
 		})).To(Equal("some test\nbar\nbar"))
 	})
