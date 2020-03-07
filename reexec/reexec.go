@@ -47,29 +47,36 @@ var reexecEnabled = false
 // profile data might be enabled.
 var testingEnabled = false
 
-// FIXME: doc
+// coverageOutputDir is the directory in which to create profile files and the
+// like. When run from "go test", our binary always runs in the source
+// directory for the package under test. The CLI argument "-test.outputdir"
+// corresponding with this variable lets "go test" tell our binary to write
+// the files in the directory where the "go test" command is run.
 var coverageOutputDir = ""
 
-// FIXME: doc
+// coverageProfile is the name of a coverage profile data file; if empty, then
+// no coverage profile is to be saved. This variable corresponds with the
+// "-test.coverprofile" CLI argument.
 var coverageProfile = ""
 
-// EnableTesting is a module-internal function for use by the
-// gons/reexec/testing package; it enables passing coverage-related test
-// parameters to re-executed child processes, as well as allocating coverage
-// profile data filenames for them.
+// EnableTesting is a module-internal function used by the gons/reexec/testing
+// (sub) package; it tells this reexec package when we're in testing mode, and
+// also passes coverage profiling-related test parameters to us. We need these
+// parameters when re-executing child processes and in order to allocate
+// coverage profile data files to these children.
 func EnableTesting(outputdir, coverprofile string) {
 	testingEnabled = true
 	coverageOutputDir = outputdir
 	coverageProfile = coverprofile
 }
 
-// coverageProfiles is a list of coverage profile data filenames for
-// re-executed child processes.
+// coverageProfiles is a list of coverage profile data filenames created by
+// re-executed child processes when under test.
 var coverageProfiles = []string{}
 
-// ReexecCoverageProfiles is a cross-package internal function, returning the
-// list of coverage profile data filenames created by re-executed child
-// processes. This information is consumed by the gons/reexec/testing package.
+// ReexecCoverageProfiles is a module-internal function, returning the list of
+// coverage profile data filenames created by re-executed child processes.
+// This information is consumed by the gons/reexec/testing (sub) package.
 func ReexecCoverageProfiles() []string { return coverageProfiles }
 
 // CheckAction checks if an application using reexec has been forked and
@@ -98,7 +105,8 @@ func RunAction() (action bool) {
 		// gain back control in this case.
 		action, ok := actions[actionname]
 		if !ok {
-			panic(fmt.Sprintf("unregistered gons/reexec re-execution action %q", actionname))
+			panic(fmt.Sprintf(
+				"unregistered gons/reexec re-execution action %q", actionname))
 		}
 		action()
 		return true
@@ -131,23 +139,30 @@ func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (
 	// calling CheckAction() very early in their runtime live.
 	if !reexecEnabled {
 		if actionname := os.Getenv(magicEnvVar); actionname == "" {
-			panic("gons/reexec: ForkReexec: application does not support forking and restarting, " +
-				" needs to call reexec.CheckAction() first before running discovery")
+			panic("gons/reexec: ForkReexec: application does not support " +
+				"forking and restarting, needs to call reexec.CheckAction() " +
+				"first before running discovery")
 		}
-		panic("gons/reexec: ForkReexec: tried to re-execute in already re-executed child process")
+		panic("gons/reexec: ForkReexec: tried to re-execute in " +
+			"already re-executing child process")
 	}
 	if _, ok := actions[actionname]; !ok {
-		panic("gons/reexec: ForkReexec: attempting to re-execute into unregistered action \"" +
-			actionname + "\"")
+		panic("gons/reexec: ForkReexec: attempting to re-execute into " +
+			"unregistered action \"" + actionname + "\"")
 	}
 	// If testing has been enabled, then make sure to pass the necessary
 	// parameters on to our child processes, as it will (have to) use a
-	// TestMain and our "enhanced" gons.reexec.testing.M. For each child we
-	// allocate a separate child coverage profile data files, if necessary,
-	// which we will have to merge later with our main coverage profile of
-	// this process. And finally, we need to run tests, as otherwise no
-	// coverage profile data would be written, but we make sure to achieve an
-	// empty set of tests to be run.
+	// TestMain and our "enhanced" gons.reexec.testing.M.
+	//
+	// When under test, we need to run tests, as otherwise no coverage profile
+	// data would be written (if requested by passing an non-empty
+	// "-test.coverprofile"), so we make sure to run an empty set of tests;
+	// this avoids the same tests getting run multiple times ... and
+	// eventually panicking when trying to re-execute again.
+	//
+	// If coverage propfiling is enabled, then for each child we allocate a
+	// separate child coverage profile data file, which we will have to merge
+	// later with our main coverage profile of this process.
 	testargs := []string{}
 	if testingEnabled {
 		if coverageProfile != "" {
@@ -162,12 +177,14 @@ func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (
 					"-test.outputdir="+coverageOutputDir)
 			}
 		}
+		// Let's suppose for a moment that no sane developer will ever use the
+		// following name for one of her/his tests...
 		testargs = append(testargs,
 			"-test.run=nadazilchnixdairgendwoimnirvanavonjottwehdeh",
 		)
 	}
 	// Prepare a fork/re-execution of ourselves, which then switches itself
-	// into the required namespace(s) before its go runtime spins up.
+	// into the required namespace(s) before its Go runtime spins up.
 	forkchild := exec.Command("/proc/self/exe", testargs...)
 	forkchild.Env = os.Environ()
 	// Pass the namespaces the fork/child should switch into via the
@@ -214,10 +231,13 @@ func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (
 	// result decoder encounters due to the child's problems.
 	childhiccup := childerr.String()
 	if childhiccup != "" {
-		return fmt.Errorf("gons/reexec: ForkReexec: child failed with stderr message: %q", childhiccup)
+		return fmt.Errorf(
+			"gons/reexec: ForkReexec: child failed with stderr message: %q",
+			childhiccup)
 	}
 	if decodererr != nil {
-		return fmt.Errorf("gons/reexec: ForkReexec: cannot decode child result, %q",
+		return fmt.Errorf(
+			"gons/reexec: ForkReexec: cannot decode child result, %q",
 			decodererr.Error())
 	}
 	return err
@@ -227,8 +247,8 @@ func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (
 // child.
 type Action func()
 
-// actions maps re-execution topics to action functions to execute on a
-// schedules re-execution.
+// actions maps re-execution topics (names) to action functions to execute on
+// a scheduled re-execution.
 var actions = map[string]Action{}
 
 // Register registers a Action function with a name so it can be

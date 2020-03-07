@@ -30,9 +30,6 @@ type M struct {
 	*gotesting.M
 }
 
-type Cover gotesting.Cover
-type CoverBlock gotesting.CoverBlock
-
 // Testing-related CLI arguments picked up from os.Args, which are of
 // relevance to coverage profile data handling.
 var (
@@ -62,28 +59,52 @@ func (m *M) Run() (exitcode int) {
 	// reexec.ForkReexec() call.
 	if !reexeced {
 		exitcode = m.M.Run()
-	} else {
-		pritiPratel(func() { exitcode = m.M.Run() })
 		// For the parent we finally need to gather the coverage profile data
 		// written by the individual re-executed child processes, and merge it
 		// with our own coverage profile data. Our data has been written at the
 		// end of the (empty) m.M.Run(), so we can only now do the final merge.
-		mergeCoverages() // FIXME: only on exitcode==0?
+		if coverProfile != "" && exitcode == 0 {
+			mergeAndReportCoverages()
+		}
+	} else {
+		pritiPratel(func() { exitcode = m.M.Run() })
 	}
 	return
 }
 
-// mergeCoverages picks up the coverage profile data files created by
+// mergeAndReportCoverages picks up the coverage profile data files created by
 // re-executed copies and merges them into this (parent) process' coverage
 // profile data.
-func mergeCoverages() {
-	for _, coverprofile := range reexec.ReexecCoverageProfiles() {
-		f, err := os.Open(toOutputDir(coverprofile))
-		if err != nil {
-			continue
+func mergeAndReportCoverages() {
+	sumcp := coverageProfile{
+		Sources: make(map[string]*coverageProfileSource),
+	}
+	// Prime summary coverage profile data from this parent's coverage profile
+	// data...
+	mergedname := toOutputDir(coverProfile)
+	mergeCoverageFile(mergedname, &sumcp)
+	// ...and then merge in the re-executed children's coverage profile data.
+	for _, coverprofilename := range reexec.ReexecCoverageProfiles() {
+		fname := toOutputDir(coverprofilename)
+		mergeCoverageFile(fname, &sumcp)
+	}
+	// Finally dump the summary coverage profile data onto the parent's
+	// coverage profile data, overwriting it.
+	f, err := os.Create(mergedname)
+	if err != nil {
+		panic("cannot report summary coverage profile data: " + err.Error())
+	}
+	defer f.Close()
+	fmt.Fprintf(f, "mode: %s\n", sumcp.Mode)
+	for sourcename, source := range sumcp.Sources {
+		for _, block := range source.Blocks {
+			fmt.Fprintf(f, "%s:%d.%d,%d.%d %d %d\n",
+				sourcename,
+				block.StartLine, block.StartCol,
+				block.EndLine, block.EndCol,
+				block.NumStmts,
+				block.Counts)
 		}
-		// TODO: merging
-		f.Close()
 	}
 }
 
