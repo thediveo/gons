@@ -61,7 +61,7 @@ var _ = Describe("reexec", func() {
 		// without the bar action being registered early enough in the child.
 		Expect(func() { Register("bar", func() {}) }).NotTo(Panic())
 		Expect(ForkReexec("bar", []Namespace{}, nil)).To(
-			MatchError(MatchRegexp(`ForkReexec: child failed: .* unregistered .* action`)))
+			MatchError(MatchRegexp(`ForkReexec: child failed with stderr message: .* unregistered .* action`)))
 	})
 
 	It("panics the child for invalid namespace", func() {
@@ -71,12 +71,12 @@ var _ = Describe("reexec", func() {
 		// there are problems entering namespaces.
 		Expect(ForkReexec("action", []Namespace{
 			{Type: "user", Path: "/proc/self/ns/user"},
-		}, nil)).To(MatchError(MatchRegexp(`ForkReexec: child failed: .* cannot join`)))
+		}, nil)).To(MatchError(MatchRegexp(`ForkReexec: child failed with stderr message: .* cannot join`)))
 	})
 
 	It("doesn't re-execute from a re-executed child", func() {
 		Expect(ForkReexec("reexec", []Namespace{}, nil)).To(
-			MatchError(MatchRegexp(`ForkReexec: child failed: .* tried to re-execute`)))
+			MatchError(MatchRegexp(`ForkReexec: child failed with stderr message: .* tried to re-execute`)))
 	})
 
 	It("panics on un-decodable child result", func() {

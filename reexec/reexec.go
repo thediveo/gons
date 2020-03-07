@@ -26,10 +26,20 @@ import (
 	"strings"
 	"time"
 
-	gons "github.com/thediveo/gons"
+	"github.com/thediveo/gons"
+	"github.com/thediveo/gons/reexec/internal/testsupport"
 )
 
-// magicEnvVar is the name of the environment variable, which triggers a
+// Breaks the vicious cycle of recursive imports which would otherwise raise
+// its ugly head: this way, gons/reexec/testing can call RunAction while under
+// test, without having to import us. Instead, we and gons/reexec/testing both
+// import gons/reexec/internal/testsupport, which in turn doesn't import
+// anything which would cause import cycles.
+func init() {
+	testsupport.RunAction = RunAction
+}
+
+// magicEnvVar defines the name of the environment variable which triggers a
 // specific registered action to be run when an application using the reexec
 // package forks and restarts itself, typically to switch into different
 // namespaces.
@@ -49,6 +59,17 @@ var reexecEnabled = false
 // scheduled reexec functionality. Please do not confuse re-execution with
 // royalists and round-heads.
 func CheckAction() {
+	if RunAction() {
+		os.Exit(0)
+	}
+}
+
+// RunAction checks if an application using the gons/reexec package has been
+// forked and re-executed as a copy of itself. If this is the case, then the
+// action specified for re-execution is run, and true returned. If this isn't
+// the case, because this is the parent process and not a re-executed child,
+// then no action is run, and false returned instead.
+func RunAction() (action bool) {
 	// Did we had a problem during reentry...?
 	if err := gons.Status(); err != nil {
 		panic(err)
@@ -58,14 +79,16 @@ func CheckAction() {
 		// gain back control in this case.
 		action, ok := actions[actionname]
 		if !ok {
-			panic(fmt.Sprintf("unregistered gons/reexec re-execution action %q", actionname))
+			panic(fmt.Sprintf(
+				"unregistered gons/reexec re-execution action %q", actionname))
 		}
 		action()
-		os.Exit(0)
+		return true
 	}
 	// Enable fork/re-execution only for the parent process of the application
 	// using reexec, but not in the re-executed child.
 	reexecEnabled = true
+	return
 }
 
 // Namespace describes a Linux kernel namespace into which a forked and
@@ -90,14 +113,34 @@ func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (
 	// calling CheckAction() very early in their runtime live.
 	if !reexecEnabled {
 		if actionname := os.Getenv(magicEnvVar); actionname == "" {
-			panic("gons/reexec: ForkReexec: application does not support forking and restarting, " +
-				" needs to call reexec.CheckAction() first before running discovery")
+			panic("gons/reexec: ForkReexec: application does not support " +
+				"forking and restarting, needs to call reexec.CheckAction() " +
+				"first before running discovery")
 		}
-		panic("gons/reexec: ForkReexec: tried to re-execute in already re-executed child process")
+		panic("gons/reexec: ForkReexec: tried to re-execute in " +
+			"already re-executing child process")
 	}
+	if _, ok := actions[actionname]; !ok {
+		panic("gons/reexec: ForkReexec: attempting to re-execute into " +
+			"unregistered action \"" + actionname + "\"")
+	}
+	// If testing has been enabled, then make sure to pass the necessary
+	// parameters on to our child processes, as it will (have to) use a
+	// TestMain and our "enhanced" gons.reexec.testing.M.
+	//
+	// When under test, we need to run tests, as otherwise no coverage profile
+	// data would be written (if requested by passing an non-empty
+	// "-test.coverprofile"), so we make sure to run an empty set of tests;
+	// this avoids the same tests getting run multiple times ... and
+	// eventually panicking when trying to re-execute again.
+	//
+	// If coverage propfiling is enabled, then for each child we allocate a
+	// separate child coverage profile data file, which we will have to merge
+	// later with our main coverage profile of this process.
+	testargs := testsupport.TestingArgs()
 	// Prepare a fork/re-execution of ourselves, which then switches itself
-	// into the required namespace(s) before its go runtime spins up.
-	forkchild := exec.Command("/proc/self/exe")
+	// into the required namespace(s) before its Go runtime spins up.
+	forkchild := exec.Command("/proc/self/exe", testargs...)
 	forkchild.Env = os.Environ()
 	// Pass the namespaces the fork/child should switch into via the
 	// soon-to-be child's environment. The sequence of the namespaces slice is
@@ -143,10 +186,13 @@ func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (
 	// result decoder encounters due to the child's problems.
 	childhiccup := childerr.String()
 	if childhiccup != "" {
-		return fmt.Errorf("gons/reexec: ForkReexec: child failed: %q", childhiccup)
+		return fmt.Errorf(
+			"gons/reexec: ForkReexec: child failed with stderr message: %q",
+			childhiccup)
 	}
 	if decodererr != nil {
-		return fmt.Errorf("gons/reexec: ForkReexec: cannot decode child result, %q",
+		return fmt.Errorf(
+			"gons/reexec: ForkReexec: cannot decode child result, %q",
 			decodererr.Error())
 	}
 	return err
@@ -156,8 +202,8 @@ func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (
 // child.
 type Action func()
 
-// actions maps re-execution topics to action functions to execute on a
-// schedules re-execution.
+// actions maps re-execution topics (names) to action functions to execute on
+// a scheduled re-execution.
 var actions = map[string]Action{}
 
 // Register registers a Action function with a name so it can be

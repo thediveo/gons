@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/thediveo/gons"
 	"github.com/thediveo/gons/reexec"
 	"github.com/thediveo/lxkns/nstypes"
 	"github.com/thediveo/lxkns/relations"
@@ -79,6 +80,13 @@ read # wait for Proceed()
 			ID(mntns),
 			ID(netns),
 		}))
+	})
+
+	It("converts ns switch errors to text", func() {
+		nse := gons.NamespaceSwitchError{}
+		Expect(nse.Error()).To(Equal(""))
+		var n *gons.NamespaceSwitchError
+		Expect(n.Error()).To(Equal("<nil>"))
 	})
 
 })
