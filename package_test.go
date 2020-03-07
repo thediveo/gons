@@ -25,16 +25,6 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	// If there was a failure in switching namespaces during initial startup,
-	// then report this and end the process with a non-zero status. We do this
-	// regardless of whether we're the original test or a re-executed child.
-	/*
-		if err := gons.Status(); err != nil {
-			_, _ = io.WriteString(os.Stderr, err.Error())
-			_, _ = io.WriteString(os.Stderr, "\n")
-			os.Exit(1)
-		}
-	*/
 	// There were no namespace switching errors, so we next register this
 	// generic re-execution handler that helps our test procedures. It simply
 	// puts the re-executed child to sleep, waiting to be killed. This allows

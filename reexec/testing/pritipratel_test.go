@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -69,12 +70,24 @@ var _ = Describe("stderr processing", func() {
 				fmt.Fprint(os.Stderr, "coverage is meh\ntest\n")
 			})
 		})).To(Equal("coverage is meh\ntest\n"))
+		long := strings.Repeat("abc", 1024)
+		Expect(capturestdout(func() {
+			pritiPratel(func() {
+				fmt.Fprint(os.Stderr, long+"\ntest\n")
+			})
+		})).To(Equal(long + "\ntest\n"))
 	})
 
 	It("hides unwanted truths about coverage: and testing:", func() {
 		Expect(capturestdout(func() {
 			pritiPratel(func() {
 				fmt.Fprint(os.Stderr, "some test\ncoverage: foo\nbar\ntesting: foo\nbar")
+			})
+		})).To(Equal("some test\nbar\nbar"))
+		long := strings.Repeat("abc", 1024)
+		Expect(capturestdout(func() {
+			pritiPratel(func() {
+				fmt.Fprint(os.Stderr, "some test\ncoverage: "+long+"\nbar\ntesting: foo\nbar")
 			})
 		})).To(Equal("some test\nbar\nbar"))
 	})

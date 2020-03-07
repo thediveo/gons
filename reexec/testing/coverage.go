@@ -17,6 +17,7 @@ package testing
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	gotesting "testing"
 
@@ -68,7 +69,11 @@ func (m *M) Run() (exitcode int) {
 		// with our own coverage profile data. Our data has been written at the
 		// end of the (empty) m.M.Run(), so we can only now do the final merge.
 		if coverProfile != "" && exitcode == 0 {
-			mergeAndReportCoverages()
+			mergeAndReportCoverages(coverProfile, testsupport.CoverageProfiles)
+			// Now clean up!
+			for _, coverprof := range testsupport.CoverageProfiles {
+				_ = os.Remove(toOutputDir(coverprof))
+			}
 		}
 	} else {
 		// Run the empty test set when we're an re-executed child, so that the
@@ -83,16 +88,16 @@ func (m *M) Run() (exitcode int) {
 // mergeAndReportCoverages picks up the coverage profile data files created by
 // re-executed copies and merges them into this (parent) process' coverage
 // profile data.
-func mergeAndReportCoverages() {
+func mergeAndReportCoverages(maincovprof string, childcovprofs []string) {
 	sumcp := coverageProfile{
 		Sources: make(map[string]*coverageProfileSource),
 	}
 	// Prime summary coverage profile data from this parent's coverage profile
 	// data...
-	mergedname := toOutputDir(coverProfile)
+	mergedname := toOutputDir(maincovprof)
 	mergeCoverageFile(mergedname, &sumcp)
 	// ...and then merge in the re-executed children's coverage profile data.
-	for _, coverprofilename := range testsupport.CoverageProfiles {
+	for _, coverprofilename := range childcovprofs {
 		fname := toOutputDir(coverprofilename)
 		mergeCoverageFile(fname, &sumcp)
 	}
@@ -104,8 +109,18 @@ func mergeAndReportCoverages() {
 	}
 	defer f.Close()
 	fmt.Fprintf(f, "mode: %s\n", sumcp.Mode)
-	for sourcename, source := range sumcp.Sources {
-		for _, block := range source.Blocks {
+	// To make testing deterministic, we need to deterministically sort the
+	// source filename keys, as otherwise the map may iterate in arbitrary
+	// order over the sources.
+	sourcenames := make([]string, len(sumcp.Sources))
+	idx := 0
+	for sourcename := range sumcp.Sources {
+		sourcenames[idx] = sourcename
+		idx++
+	}
+	sort.Strings(sourcenames)
+	for _, sourcename := range sourcenames {
+		for _, block := range sumcp.Sources[sourcename].Blocks {
 			fmt.Fprintf(f, "%s:%d.%d,%d.%d %d %d\n",
 				sourcename,
 				block.StartLine, block.StartCol,

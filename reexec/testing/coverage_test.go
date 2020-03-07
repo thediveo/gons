@@ -16,6 +16,9 @@ package testing
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -33,6 +36,57 @@ var _ = Describe("coveraging re-execution", func() {
 	It("re-executes action foo self-test", func() {
 		var result string
 		Expect(reexec.ForkReexec("foo", nil, &result)).To(Succeed())
+	})
+
+	It("outputs to directory", func() {
+		oldod := outputDir
+		defer func() { outputDir = oldod }()
+		Expect(toOutputDir("foo")).To(Equal("foo"))
+		Expect(toOutputDir("/foo")).To(Equal("/foo"))
+		outputDir = "bar"
+		Expect(toOutputDir("foo")).To(Equal("bar/foo"))
+		Expect(toOutputDir("/foo")).To(Equal("/foo"))
+	})
+
+	It("parses coverage-related CLI args", func() {
+		oldod, oldcp := outputDir, coverProfile
+		defer func() { outputDir, coverProfile = oldod, oldcp }()
+		arghs := []string{
+			"abc",
+			"-test.outputdir=bar",
+			"-test.coverprofile=foo",
+			"-args",
+			"-test.outputdir=xxx",
+		}
+		parseCoverageArgs(arghs)
+		Expect(outputDir).To(Equal("bar"))
+		Expect(coverProfile).To(Equal("foo"))
+	})
+
+	It("merges coverage reports and writes merged report", func() {
+		tmpdir, err := ioutil.TempDir("", "covreport")
+		Expect(err).NotTo(HaveOccurred())
+		defer os.RemoveAll(tmpdir)
+
+		ffrom, err := os.Open("test/cov1.cov")
+		Expect(err).NotTo(HaveOccurred())
+		defer ffrom.Close()
+		fto, err := os.Create(tmpdir + "/main.cov")
+		Expect(err).NotTo(HaveOccurred())
+		defer fto.Close()
+		_, err = io.Copy(fto, ffrom)
+		Expect(err).NotTo(HaveOccurred())
+		ffrom.Close() // yep, close it now; double closes are alright.
+		fto.Close()   // yep, close it now; double closes are alright.
+
+		mergeAndReportCoverages(
+			tmpdir+"/main.cov",
+			[]string{"test/cov2.cov"})
+		actualfinalreport, err := ioutil.ReadFile(tmpdir + "/main.cov")
+		Expect(err).NotTo(HaveOccurred())
+		finalreport, err := ioutil.ReadFile("test/final.cov")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(actualfinalreport)).To(Equal(string(finalreport)))
 	})
 
 })

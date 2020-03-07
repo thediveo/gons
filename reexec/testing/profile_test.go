@@ -83,7 +83,7 @@ var _ = Describe("coverage profile data", func() {
 			EndLine:   2,
 			EndCol:    42,
 			NumStmts:  3,
-			Counts:    4560,
+			Counts:    457,
 		}))
 	})
 

@@ -164,7 +164,7 @@ func mergeCoverageFile(path string, sumcp *coverageProfile) {
 	NextBlock:
 		for _, block := range source.Blocks {
 			for sumblkidx < len(sumsource.Blocks) {
-				sumblock := sumsource.Blocks[sumblkidx]
+				sumblock := &sumsource.Blocks[sumblkidx]
 				sumblkidx++ // yes, increment anyway, as no block appears twice.
 				if sumblock.StartLine == block.StartLine &&
 					sumblock.StartCol == block.StartCol &&
