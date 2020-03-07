@@ -32,6 +32,13 @@ type coverageProfile struct {
 	Sources map[string]*coverageProfileSource
 }
 
+// newCoverageProfile returns a new and correctly initialized coverageProfile.
+func newCoverageProfile() *coverageProfile {
+	return &coverageProfile{
+		Sources: map[string]*coverageProfileSource{},
+	}
+}
+
 // coverageProfileSource represents the coverage blocks of a single source
 // file.
 type coverageProfileSource struct {
@@ -72,9 +79,13 @@ var lineRe = regexp.MustCompile(`^(.+):([0-9]+).([0-9]+),([0-9]+).([0-9]+) ([0-9
 // the path parameter and merges it with the summary coverage profile in
 // sumcp.
 func mergeCoverageFile(path string, sumcp *coverageProfile) {
-	fmt.Fprintf(os.Stderr, "****MERGING %q\n", path)
 	cpf, err := os.Open(toOutputDir(path))
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Silenty skip the situation when a re-execution did not create a
+			// coverage profile data file.
+			return
+		}
 		panic(fmt.Sprintf(
 			"unable to merge coverage profile data file %q: %s",
 			toOutputDir(path), err.Error()))
@@ -86,9 +97,7 @@ func mergeCoverageFile(path string, sumcp *coverageProfile) {
 	}
 	// Phase I: read in the specified coverage profile data file, before we
 	// can attempt to merge it.
-	cp := coverageProfile{
-		Sources: map[string]*coverageProfileSource{},
-	}
+	cp := newCoverageProfile()
 	// The first line of a coverage profile data file is the mode how
 	// coverage data was gathered; either "atomic", "count", or "set".
 	line := scan.Text()
@@ -141,9 +150,6 @@ func mergeCoverageFile(path string, sumcp *coverageProfile) {
 	// merge the coverage block data into the summary coverage profile.
 	setmode := sumcp.Mode == "set"
 	for srcname, source := range cp.Sources {
-		if len(source.Blocks) == 0 {
-			continue // skip empty sources early.
-		}
 		sort.Sort(coverageProfileBlockByStart(source.Blocks))
 		// Look up the corresponding source in the summary coverage profile,
 		// or create a new one, if not already present.

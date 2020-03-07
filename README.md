@@ -72,6 +72,32 @@ application process, and then terminating the re-executed child. The parent
 process (or rather: go routine) then continues, working on the intelligence
 gathered.
 
+## gons/reexec/testing
+
+So you want to get code coverage data even across one or several
+re-executions? Then you'll need to add a `TestMain` as follows:
+
+```go
+package foobar
+
+import (
+    "testing"
+
+    rxtst "github.com/thediveo/gons/reexec/testing"
+)
+
+func TestMain(m *testing.M) {
+    mm := &rxtst.M{M: m}
+    os.Exit(mm.Run())
+}
+```
+
+As you can see from this code above, `TestMain` takes the usual `m *testing.M`
+parameter. But instead of directly calling `m.Run()` we have to wrap it into a
+`txtst.M` instead, and call `Run()` only on the wrapper. This wrapper contains
+the magic to cause re-executed actions to write coverage profile data and to
+merge it with the main process' coverage profile data.
+
 ## Copyright and License
 
 `gons` is Copyright 2019 Harald Albrecht, and licensed under the Apache

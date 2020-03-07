@@ -22,6 +22,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/thediveo/gons"
+	rxtst "github.com/thediveo/gons/reexec/testing"
 )
 
 // As we need to do some pre-test checks in order to run actions on
@@ -36,11 +37,9 @@ func TestMain(m *testing.M) {
 		_, _ = io.WriteString(os.Stderr, "\n")
 		os.Exit(1)
 	}
-	// Ensure that the registered handler is run in the re-executed child. If
-	// we're not in re-execution, then CheckAction() will simply return.
-	// Otherwise, it will exit() after the requested action has been run.
-	CheckAction()
-	os.Exit(m.Run())
+	// We eat our own dog (testing) food here...
+	mm := &rxtst.M{M: m}
+	os.Exit(mm.Run())
 }
 
 func TestPackage(t *testing.T) {

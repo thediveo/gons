@@ -15,25 +15,26 @@
 package gons_test
 
 import (
-	"io"
 	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/thediveo/gons"
 	"github.com/thediveo/gons/reexec"
+	rxtst "github.com/thediveo/gons/reexec/testing"
 )
 
 func TestMain(m *testing.M) {
 	// If there was a failure in switching namespaces during initial startup,
 	// then report this and end the process with a non-zero status. We do this
 	// regardless of whether we're the original test or a re-executed child.
-	if err := gons.Status(); err != nil {
-		_, _ = io.WriteString(os.Stderr, err.Error())
-		_, _ = io.WriteString(os.Stderr, "\n")
-		os.Exit(1)
-	}
+	/*
+		if err := gons.Status(); err != nil {
+			_, _ = io.WriteString(os.Stderr, err.Error())
+			_, _ = io.WriteString(os.Stderr, "\n")
+			os.Exit(1)
+		}
+	*/
 	// There were no namespace switching errors, so we next register this
 	// generic re-execution handler that helps our test procedures. It simply
 	// puts the re-executed child to sleep, waiting to be killed. This allows
@@ -44,11 +45,12 @@ func TestMain(m *testing.M) {
 		// parent when the test is done. What a lovely family.
 		select {}
 	})
-	// Ensure that the registered handler is run in the re-executed child. This
-	// won't trigger the handler while we're in the parent, because the
-	// parent's Arg[0] won't match the name of our handler.
-	reexec.CheckAction()
-	os.Exit(m.Run())
+	// Ensure that the registered handler is run in the re-executed child.
+	// This won't trigger the handler while we're in the parent, because the
+	// parent's Arg[0] won't match the name of our handler. Oh, and we eat our
+	// own dog (testing) food here...
+	mm := &rxtst.M{M: m}
+	os.Exit(mm.Run())
 }
 
 func TestPackage(t *testing.T) {

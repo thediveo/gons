@@ -2,7 +2,6 @@ package testing
 
 import (
 	"os"
-	"testing"
 	gotesting "testing"
 
 	. "github.com/onsi/ginkgo"
@@ -15,7 +14,7 @@ func TestMain(m *gotesting.M) {
 	os.Exit(mm.Run())
 }
 
-func TestPackage(t *testing.T) {
+func TestPackage(t *gotesting.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "gons/reexec/testing package")
 }

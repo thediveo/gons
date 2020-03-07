@@ -20,7 +20,7 @@ import (
 	"strings"
 	gotesting "testing"
 
-	"github.com/thediveo/gons/reexec"
+	"github.com/thediveo/gons/reexec/internal/testsupport"
 )
 
 // M is an "enhanced" version of Golang's testing.M which additionally handles
@@ -43,14 +43,18 @@ var (
 // os.Exit.
 func (m *M) Run() (exitcode int) {
 	// If necessary, run the action first, as this gathers the coverage
-	// profile data during re-execution, which we are interested in.
-	reexeced := reexec.RunAction()
+	// profile data during re-execution, which we are interested in. Please
+	// note that we cannot use gons.reexec.RunAction() directly, as this would
+	// result in an import cycle. To break this vicious cycle we use
+	// testsupport's RunAction instead, which gons.reexec will initialize to
+	// point to its real implementation of RunAction.
+	reexeced := testsupport.RunAction()
 	// If we're in coverage mode and we're the parent test process, then pass
 	// the required test argument settings to the gons/reexec package, so that
 	// it can correctly re-execute child processes under test.
 	parseCoverageArgs(os.Args)
 	if !reexeced {
-		reexec.EnableTesting(outputDir, coverProfile)
+		testsupport.EnableTesting(outputDir, coverProfile)
 	}
 	// Run the tests: for the parent this will be an ordinary test run, but
 	// for a re-executed child the passed "-test.run" argument will ensure
@@ -67,7 +71,11 @@ func (m *M) Run() (exitcode int) {
 			mergeAndReportCoverages()
 		}
 	} else {
-		pritiPratel(func() { exitcode = m.M.Run() })
+		// Run the empty test set when we're an re-executed child, so that the
+		// Go testing package creates a coverage profile data report.
+		pritiPratel(func() {
+			exitcode = m.M.Run()
+		})
 	}
 	return
 }
@@ -84,7 +92,7 @@ func mergeAndReportCoverages() {
 	mergedname := toOutputDir(coverProfile)
 	mergeCoverageFile(mergedname, &sumcp)
 	// ...and then merge in the re-executed children's coverage profile data.
-	for _, coverprofilename := range reexec.ReexecCoverageProfiles() {
+	for _, coverprofilename := range testsupport.CoverageProfiles {
 		fname := toOutputDir(coverprofilename)
 		mergeCoverageFile(fname, &sumcp)
 	}
@@ -126,6 +134,9 @@ func parseCoverageArgs(args []string) {
 // toOutputDir is a Linux-only variant of testing's toOutputDir: it returns
 // the specified filename relocated, if required, to outputDir.
 func toOutputDir(path string) string {
+	if outputDir == "" || path == "" {
+		return path
+	}
 	// If the name of the coverage profile data file is already an absolute
 	// path, then simply return it.
 	if os.IsPathSeparator(path[0]) {
