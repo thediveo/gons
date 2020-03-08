@@ -50,18 +50,30 @@ var _ = Describe("reexec", func() {
 		Expect(s).To(Equal("done"))
 	})
 
+	It("panics when re-execution wasn't properly enabled", func() {
+		defer func(old bool) { reexecEnabled = old }(reexecEnabled)
+		reexecEnabled = false
+		Expect(func() { _ = ForkReexec("action", []Namespace{}, nil) }).To(Panic())
+	})
+
 	It("doesn't accept registering the same action name twice", func() {
 		Expect(func() { Register("foo", func() {}) }).NotTo(Panic())
 		Expect(func() { Register("foo", func() {}) }).To(Panic())
+	})
+
+	It("doesn't accept triggering a non-registered action", func() {
+		Expect(func() { _ = ForkReexec("xxx", []Namespace{}, nil) }).To(Panic())
 	})
 
 	It("panics the child for a non-preregistered action", func() {
 		// Note how registering the bar action here will cause the re-executed
 		// package test child to fail, because this will trigger CheckAction()
 		// without the bar action being registered early enough in the child.
-		Expect(func() { Register("bar", func() {}) }).NotTo(Panic())
-		Expect(ForkReexec("bar", []Namespace{}, nil)).To(
-			MatchError(MatchRegexp(`ForkReexec: child failed with stderr message: .* unregistered .* action`)))
+		Expect(func() { Register("barx", func() {}) }).NotTo(Panic())
+		err := ForkReexec("barx", []Namespace{}, nil)
+		Expect(err).To(MatchError(MatchRegexp(
+			`.* ForkReexec: child failed with stderr message: ` +
+				`"unregistered .* action .*\\"barx\\""`)))
 	})
 
 	It("panics the child for invalid namespace", func() {

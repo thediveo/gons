@@ -82,8 +82,8 @@ func mergeCoverageFile(path string, sumcp *coverageProfile) {
 	cpf, err := os.Open(toOutputDir(path))
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Silenty skip the situation when a re-execution did not create a
-			// coverage profile data file.
+			// Silently skip the situation when a re-execution did not create
+			// a coverage profile data file.
 			return
 		}
 		panic(fmt.Sprintf(
@@ -190,6 +190,9 @@ func mergeCoverageFile(path string, sumcp *coverageProfile) {
 	}
 }
 
+// toUint32 converts a textual int value into its binary uint32
+// representation. If the specified text doesn't represent a valid uint32
+// value, toUint32 panics.
 func toUint32(s string) uint32 {
 	if v, err := strconv.ParseUint(s, 10, 32); err != nil {
 		panic(err.Error())
@@ -198,6 +201,9 @@ func toUint32(s string) uint32 {
 	}
 }
 
+// toUint16 converts a textual int value into its binary uint16
+// representation. If the specified text doesn't represent a valid uint16
+// value, toUint16 panics.
 func toUint16(s string) uint16 {
 	if v, err := strconv.ParseUint(s, 10, 16); err != nil {
 		panic(err.Error())

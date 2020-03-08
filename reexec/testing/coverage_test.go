@@ -31,6 +31,17 @@ func init() {
 	})
 }
 
+func copyfile(from, to string) {
+	ffrom, err := os.Open(from)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	defer ffrom.Close()
+	fto, err := os.Create(to)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	defer fto.Close()
+	_, err = io.Copy(fto, ffrom)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+}
+
 var _ = Describe("coveraging re-execution", func() {
 
 	It("re-executes action foo self-test", func() {
@@ -46,6 +57,18 @@ var _ = Describe("coveraging re-execution", func() {
 		outputDir = "bar"
 		Expect(toOutputDir("foo")).To(Equal("bar/foo"))
 		Expect(toOutputDir("/foo")).To(Equal("/foo"))
+	})
+
+	It("panics on read-only coverage report", func() {
+		tmpdir, err := ioutil.TempDir("", "covreport")
+		Expect(err).NotTo(HaveOccurred())
+		defer os.RemoveAll(tmpdir)
+		copyfile("test/cov1.cov", tmpdir+"/main.cov")
+		Expect(os.Chmod(tmpdir+"/main.cov", 0400))
+		defer func() { _ = os.Chmod(tmpdir+"/main.cov", 0600) }()
+		Expect(func() {
+			mergeAndReportCoverages(tmpdir+"/main.cov", []string{})
+		}).To(Panic())
 	})
 
 	It("parses coverage-related CLI args", func() {
@@ -67,17 +90,7 @@ var _ = Describe("coveraging re-execution", func() {
 		tmpdir, err := ioutil.TempDir("", "covreport")
 		Expect(err).NotTo(HaveOccurred())
 		defer os.RemoveAll(tmpdir)
-
-		ffrom, err := os.Open("test/cov1.cov")
-		Expect(err).NotTo(HaveOccurred())
-		defer ffrom.Close()
-		fto, err := os.Create(tmpdir + "/main.cov")
-		Expect(err).NotTo(HaveOccurred())
-		defer fto.Close()
-		_, err = io.Copy(fto, ffrom)
-		Expect(err).NotTo(HaveOccurred())
-		ffrom.Close() // yep, close it now; double closes are alright.
-		fto.Close()   // yep, close it now; double closes are alright.
+		copyfile("test/cov1.cov", tmpdir+"/main.cov")
 
 		mergeAndReportCoverages(
 			tmpdir+"/main.cov",

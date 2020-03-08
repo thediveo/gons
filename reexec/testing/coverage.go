@@ -19,71 +19,14 @@ import (
 	"os"
 	"sort"
 	"strings"
-	gotesting "testing"
-
-	"github.com/thediveo/gons/reexec/internal/testsupport"
 )
 
-// M is an "enhanced" version of Golang's testing.M which additionally handles
-// merging coverage profile data from re-executions into the main ("parent's")
-// coverage profile file.
-type M struct {
-	*gotesting.M
-}
-
-// Testing-related CLI arguments picked up from os.Args, which are of
-// relevance to coverage profile data handling.
+// Testing (coverage) related CLI arguments picked up from os.Args, which are
+// of relevance to coverage profile data handling.
 var (
 	outputDir    string // "-test.outputdir"
 	coverProfile string // "-test.coverprofile"
 )
-
-// Run runs the tests and for the parent process then correctly merges the
-// coverage profile data from re-executed process copies into this parent
-// process' coverage profile data. Run returns an exit code to pass to
-// os.Exit.
-func (m *M) Run() (exitcode int) {
-	// If necessary, run the action first, as this gathers the coverage
-	// profile data during re-execution, which we are interested in. Please
-	// note that we cannot use gons.reexec.RunAction() directly, as this would
-	// result in an import cycle. To break this vicious cycle we use
-	// testsupport's RunAction instead, which gons.reexec will initialize to
-	// point to its real implementation of RunAction.
-	reexeced := testsupport.RunAction()
-	// If we're in coverage mode and we're the parent test process, then pass
-	// the required test argument settings to the gons/reexec package, so that
-	// it can correctly re-execute child processes under test.
-	parseCoverageArgs(os.Args)
-	if !reexeced {
-		testsupport.EnableTesting(outputDir, coverProfile)
-	}
-	// Run the tests: for the parent this will be an ordinary test run, but
-	// for a re-executed child the passed "-test.run" argument will ensure
-	// that actually no tests are run at all, because that would result in
-	// tests executed multiple times and panic when hitting a recursive
-	// reexec.ForkReexec() call.
-	if !reexeced {
-		exitcode = m.M.Run()
-		// For the parent we finally need to gather the coverage profile data
-		// written by the individual re-executed child processes, and merge it
-		// with our own coverage profile data. Our data has been written at the
-		// end of the (empty) m.M.Run(), so we can only now do the final merge.
-		if coverProfile != "" && exitcode == 0 {
-			mergeAndReportCoverages(coverProfile, testsupport.CoverageProfiles)
-			// Now clean up!
-			for _, coverprof := range testsupport.CoverageProfiles {
-				_ = os.Remove(toOutputDir(coverprof))
-			}
-		}
-	} else {
-		// Run the empty test set when we're an re-executed child, so that the
-		// Go testing package creates a coverage profile data report.
-		pritiPratel(func() {
-			exitcode = m.M.Run()
-		})
-	}
-	return
-}
 
 // mergeAndReportCoverages picks up the coverage profile data files created by
 // re-executed copies and merges them into this (parent) process' coverage
