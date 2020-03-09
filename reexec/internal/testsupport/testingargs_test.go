@@ -1,4 +1,4 @@
-// Copyright 2019 Harald Albrecht.
+// Copyright 2020 Harald Albrecht.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,29 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package reexec
+package testsupport
 
 import (
-	"os"
-	"testing"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	rxtst "github.com/thediveo/gons/reexec/testing"
 )
 
-// As we need to do some pre-test checks in order to run actions on
-// re-execution, wo go for TestMain instead of an ordinary TextXxx function
-// when unit-testing this package.
-func TestMain(m *testing.M) {
-	// We eat our own dog (testing) food here...
-	mm := &rxtst.M{M: m}
-	os.Exit(mm.Run())
-}
+var _ = Describe("testing-related args", func() {
 
-func TestPackage(t *testing.T) {
-	// Okay, we're a real test suite, and there was no re-executed child
-	// handler triggering... :)
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "gons/reexec package")
-}
+	It("correctly generates child's testing-related args", func() {
+		defer func(et bool) { TestingEnabled = et }(TestingEnabled)
+		defer func() { CoverageProfiles = []string{} }()
+		EnableTesting("/foo", "bar")
+		tstargs := TestingArgs()
+		Expect(tstargs).To(ContainElement("-test.coverprofile=bar_0"))
+		Expect(tstargs).To(ContainElement("-test.outputdir=/foo"))
+		Expect(tstargs).To(ContainElement(MatchRegexp("-test.run=.+")))
+	})
+
+})

@@ -3,6 +3,7 @@ module github.com/thediveo/gons
 go 1.13
 
 require (
+	github.com/fzipp/gocyclo v0.0.0-20150627053110-6acd4345c835 // indirect
 	github.com/google/uuid v1.1.1 // indirect
 	github.com/moby/moby v1.13.1
 	github.com/onsi/ginkgo v1.12.0

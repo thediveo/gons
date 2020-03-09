@@ -73,18 +73,61 @@ var modeRe = regexp.MustCompile(`^mode: ([[:alpha:]]+)$`)
 
 // lineRe specifies the format of the block text lines in coverage profile
 // data files.
-var lineRe = regexp.MustCompile(`^(.+):([0-9]+).([0-9]+),([0-9]+).([0-9]+) ([0-9]+) ([0-9]+)$`)
+var lineRe = regexp.MustCompile(
+	`^(.+):([0-9]+).([0-9]+),([0-9]+).([0-9]+) ([0-9]+) ([0-9]+)$`)
 
 // mergeCoverageFile reads coverage profile data from the file specified in
 // the path parameter and merges it with the summary coverage profile in
 // sumcp.
 func mergeCoverageFile(path string, sumcp *coverageProfile) {
+	// Phase I: read in the specified coverage profile data file, before we
+	// can attempt to merge it.
+	cp := readcovfile(path)
+	if cp == nil {
+		return
+	}
+	// Phase II: check for the proper coverage profile mode; if not set yet
+	// for the results, then accept the one from the coverage profile just
+	// read. Normally, this will be the "main" coverage profile file created
+	// by the process under test, as we'll read in the other profiles from
+	// re-executed children only later.
+	if sumcp.Mode == "" {
+		sumcp.Mode = cp.Mode
+	} else if cp.Mode != sumcp.Mode {
+		panic(fmt.Sprintf("expected mode %q, got mode %q", sumcp.Mode, cp.Mode))
+	}
+	// Phase III: for each source, append the new blocks to the existing ones,
+	// sort them, and then finally merge blocks.
+	setmode := sumcp.Mode == "set"
+	for srcname, source := range cp.Sources {
+		// Look up the corresponding source in the summary coverage profile,
+		// or create a new one, if not already present.
+		var sumsource *coverageProfileSource
+		var ok bool
+		if sumsource, ok = sumcp.Sources[srcname]; !ok {
+			sumsource = &coverageProfileSource{Blocks: source.Blocks}
+			sumcp.Sources[srcname] = sumsource
+		} else {
+			sumsource.Blocks = append(sumsource.Blocks, source.Blocks...)
+		}
+		// We might not merge, but we do sort anyway. While not strictly
+		// necessary, this helps our tests to have a well-defined result
+		// order.
+		mergecovblocks(sumsource, setmode)
+	}
+}
+
+// readcovfile reads a coverage profile data file and returns it as a
+// coverageProfile. Returns nil if no such coverage profile file exists or is
+// empty. If the file turns out to be unparseable for some other reason, it
+// simply panics.
+func readcovfile(path string) *coverageProfile {
 	cpf, err := os.Open(toOutputDir(path))
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Silenty skip the situation when a re-execution did not create a
-			// coverage profile data file.
-			return
+			// Silently skip the situation when a re-execution did not create
+			// a coverage profile data file.
+			return nil
 		}
 		panic(fmt.Sprintf(
 			"unable to merge coverage profile data file %q: %s",
@@ -93,7 +136,7 @@ func mergeCoverageFile(path string, sumcp *coverageProfile) {
 	defer cpf.Close()
 	scan := bufio.NewScanner(cpf)
 	if !scan.Scan() {
-		return
+		return nil
 	}
 	// Phase I: read in the specified coverage profile data file, before we
 	// can attempt to merge it.
@@ -140,56 +183,12 @@ func mergeCoverageFile(path string, sumcp *coverageProfile) {
 			Counts:    toUint32(m[7]),
 		})
 	}
-	// Phase II: check for the proper coverage profile mode first...
-	if sumcp.Mode == "" {
-		sumcp.Mode = cp.Mode
-	} else if cp.Mode != sumcp.Mode {
-		panic(fmt.Sprintf("expected mode %q, got mode %q", sumcp.Mode, cp.Mode))
-	}
-	// Phase III: for each source, sort the source's coverage blocks and then
-	// merge the coverage block data into the summary coverage profile.
-	setmode := sumcp.Mode == "set"
-	for srcname, source := range cp.Sources {
-		sort.Sort(coverageProfileBlockByStart(source.Blocks))
-		// Look up the corresponding source in the summary coverage profile,
-		// or create a new one, if not already present.
-		var sumsource *coverageProfileSource
-		var ok bool
-		if sumsource, ok = sumcp.Sources[srcname]; !ok {
-			sumsource = &coverageProfileSource{}
-			sumcp.Sources[srcname] = sumsource
-		}
-		// Now merge...
-		sumblkidx := 0
-	NextBlock:
-		for _, block := range source.Blocks {
-			for sumblkidx < len(sumsource.Blocks) {
-				sumblock := &sumsource.Blocks[sumblkidx]
-				sumblkidx++ // yes, increment anyway, as no block appears twice.
-				if sumblock.StartLine == block.StartLine &&
-					sumblock.StartCol == block.StartCol &&
-					sumblock.EndLine == block.EndLine &&
-					sumblock.EndCol == block.EndCol {
-					// We've found a matching code block, so update its
-					// coverage data.
-					if setmode {
-						sumblock.Counts |= block.Counts
-					} else {
-						sumblock.Counts += block.Counts
-					}
-					continue NextBlock
-				}
-			}
-			// No matching block found, append it. Since the coverage profile
-			// data files come from parent and children runs on the same
-			// snapshot of sources, they contain the same blocks. And since
-			// we've sorted the blocks, we can simply append and it should
-			// still keep sorting order.
-			sumsource.Blocks = append(sumsource.Blocks, block)
-		}
-	}
+	return cp
 }
 
+// toUint32 converts a textual int value into its binary uint32
+// representation. If the specified text doesn't represent a valid uint32
+// value, toUint32 panics.
 func toUint32(s string) uint32 {
 	if v, err := strconv.ParseUint(s, 10, 32); err != nil {
 		panic(err.Error())
@@ -198,10 +197,48 @@ func toUint32(s string) uint32 {
 	}
 }
 
+// toUint16 converts a textual int value into its binary uint16
+// representation. If the specified text doesn't represent a valid uint16
+// value, toUint16 panics.
 func toUint16(s string) uint16 {
 	if v, err := strconv.ParseUint(s, 10, 16); err != nil {
 		panic(err.Error())
 	} else {
 		return uint16(v)
 	}
+}
+
+// mergecovblocks merges coverage blocks for the same code blocks.
+func mergecovblocks(sumsource *coverageProfileSource, setmode bool) {
+	// First sort, so that multiple coverages for the same block location will
+	// be adjacent.
+	sort.Sort(coverageProfileBlockByStart(sumsource.Blocks))
+	mergeidx := 0
+	for idx := mergeidx + 1; idx < len(sumsource.Blocks); idx++ {
+		mergeblock := &sumsource.Blocks[mergeidx]
+		block := &sumsource.Blocks[idx]
+		if mergeblock.StartLine == block.StartLine &&
+			mergeblock.StartCol == block.StartCol &&
+			mergeblock.EndLine == block.EndLine &&
+			mergeblock.EndCol == block.EndCol {
+			// We've found a(nother) matching code block, so update the
+			// first's coverage data.
+			if setmode {
+				mergeblock.Counts |= block.Counts
+			} else {
+				mergeblock.Counts += block.Counts
+			}
+			continue
+		}
+		// We've reached a different code location after a set of mergeable
+		// locations, so move this new location block downwards to the end of
+		// already merged blocks.
+		mergeidx++
+		if mergeidx != idx {
+			sumsource.Blocks[mergeidx] = *block
+		}
+	}
+	// Shorten the code block locations slice to only, erm, "cover" the unique
+	// (and probably merged) blocks.
+	sumsource.Blocks = sumsource.Blocks[:mergeidx+1]
 }

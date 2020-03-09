@@ -16,6 +16,7 @@ package testing
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"strings"
 )
@@ -46,70 +47,7 @@ func pritiPratel(f func()) {
 	// It runs as a separate Go routine, which only terminates on (real) read
 	// errors.
 	done := make(chan struct{})
-	go func() {
-		r := bufio.NewReaderSize(reader, 1024)
-		for {
-			// Assume that we're starting with a new line here, so sort out
-			// any output beginning with "coverage:" or "testing:".
-			line, isprefix, err := r.ReadLine()
-			if err != nil {
-				// bufio.Reader.ReadLine() either returns a non-nil line or it
-				// returns an error, never both.
-				close(done)
-				return
-			}
-			tobehidden := false
-			for _, h := range hide {
-				if strings.HasPrefix(string(line), h) {
-					// This line of output should be dropped. In case this
-					// line is longer than the buffer, drop until the end of
-					// line chunk by chunk.
-					for isprefix {
-						_, isprefix, err = r.ReadLine()
-						if err != nil {
-							close(done)
-							return
-						}
-					}
-					tobehidden = true
-					break
-				}
-			}
-			if tobehidden {
-				continue
-			}
-			// It's output we should better pass on...
-			if _, err := realStderr.Write(line); err != nil {
-				close(done)
-				return
-			}
-			for isprefix {
-				line, isprefix, err = r.ReadLine()
-				if err != nil {
-					close(done)
-					return
-				}
-				if _, err := realStderr.Write(line); err != nil {
-					close(done)
-					return
-				}
-			}
-			// Handle the case where we have read the final line before EOF,
-			// which doesn't end in \n: in this situation, we must not append
-			// any \n to the output.
-			if err := r.UnreadByte(); err != nil {
-				close(done)
-				return
-			}
-			if b, err := r.ReadByte(); err == nil && b == '\n' {
-				if _, err := realStderr.Write([]byte{'\n'}); err != nil {
-					close(done)
-					return
-				}
-			}
-		}
-		// unreachable
-	}()
+	go prattlepiper(reader, realStderr, done)
 	// Now run the desired function f() while scanning its output for unwanted
 	// rogue lies which we need to suppress. Definitely a Johnson function
 	// here.
@@ -121,4 +59,62 @@ func pritiPratel(f func()) {
 var hide = []string{
 	"coverage:",
 	"testing:",
+}
+
+// prattlepiper reads from the specified reader, passing the read prattle to
+// the specified writer, but excluding certain topics, as specified in the
+// hide list.
+func prattlepiper(reader io.Reader, writer io.Writer, done chan struct{}) {
+	defer close(done)
+	r := bufio.NewReaderSize(reader, 1024)
+new_line:
+	for {
+		// Assume that we're starting with a new line here, so sort out
+		// any output beginning with "coverage:" or "testing:".
+		line, isprefix, err := r.ReadLine()
+		if err != nil {
+			// bufio.Reader.ReadLine() either returns a non-nil line or it
+			// returns an error, never both.
+			return
+		}
+		for _, h := range hide {
+			if strings.HasPrefix(string(line), h) {
+				// This line of output should be dropped. In case this
+				// line is longer than the buffer, drop until the end of
+				// line chunk by chunk.
+				for isprefix {
+					_, isprefix, err = r.ReadLine()
+					if err != nil {
+						return
+					}
+				}
+				continue new_line
+			}
+		}
+		// It's output we should better pass on...
+		if _, err := writer.Write(line); err != nil {
+			return
+		}
+		for isprefix {
+			line, isprefix, err = r.ReadLine()
+			if err != nil {
+				return
+			}
+			if _, err := writer.Write(line); err != nil {
+				return
+			}
+		}
+		// Handle the case where we have read the final line before EOF,
+		// which doesn't end in \n: in this situation, we must not append
+		// any \n to the output.
+		if err := r.UnreadByte(); err != nil {
+			return
+		}
+		if b, err := r.ReadByte(); err == nil && b == '\n' {
+			if _, err := writer.Write([]byte{'\n'}); err != nil {
+				return
+			}
+		}
+	}
+	// unreachable
 }
