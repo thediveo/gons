@@ -72,6 +72,34 @@ application process, and then terminating the re-executed child. The parent
 process (or rather: go routine) then continues, working on the intelligence
 gathered.
 
+A very simplistic example:
+
+```go
+package main
+
+import (
+  "fmt"
+  "github.com/thediveo/gons/reexec"
+)
+
+func init() {
+  reexec.Register("answertoeverything", func() {
+    fmt.Fprintln(os.Stdout, `42`)
+  })
+}
+
+func main() {
+  var answer int
+  exec.ForkReexec("answertoeverything", []Namespace{}, &s)
+  fmt.Printf("answer: %d\n", answer)
+}
+```
+
+- `reexec.Register` registers an action with its name and the code to execute.
+- `reexec.ForkReexec` forks and re-executes itself as a child process,
+  triggering the named action. It then picks up the result, which the action
+  has to print to `os.Stdout` in JSON format, and prints the result.
+
 ## gons/reexec/testing
 
 So you want to get code coverage data even across one or several

@@ -60,9 +60,12 @@ var reexecEnabled = false
 // royalists and round-heads.
 func CheckAction() {
 	if RunAction() {
-		os.Exit(0)
+		osExit(0)
 	}
 }
+
+// For the sake of code coverage ;)
+var osExit = os.Exit
 
 // RunAction checks if an application using the gons/reexec package has been
 // forked and re-executed as a copy of itself. If this is the case, then the

@@ -40,9 +40,22 @@ func init() {
 	Register("reexec", func() {
 		_ = ForkReexec("reexec", []Namespace{}, nil)
 	})
+	Register("silent", func() {})
 }
 
 var _ = Describe("reexec", func() {
+
+	It("runs action and exits", func() {
+		ec := -1
+		osExit = func(code int) { ec = code }
+		defer func() {
+			osExit = os.Exit
+			os.Setenv(magicEnvVar, "")
+		}()
+		os.Setenv(magicEnvVar, "silent")
+		CheckAction()
+		Expect(ec).To(Equal(0))
+	})
 
 	It("runs action and decodes answer", func() {
 		var s string

@@ -15,7 +15,6 @@
 package gons_test
 
 import (
-	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -35,12 +34,10 @@ func TestMain(m *testing.M) {
 		// parent when the test is done. What a lovely family.
 		select {}
 	})
-	// Ensure that the registered handler is run in the re-executed child.
-	// This won't trigger the handler while we're in the parent, because the
-	// parent's Arg[0] won't match the name of our handler. Oh, and we eat our
-	// own dog (testing) food here...
-	mm := &rxtst.M{M: m}
-	os.Exit(mm.Run())
+	// Do NOT USE rxtst.TestMainWithCoverage in your own tests. Use instead:
+	//   mm := &rxtst.M{M: m}
+	//   os.Exit(mm.Run())
+	rxtst.TestMainWithCoverage(m)
 }
 
 func TestPackage(t *testing.T) {
