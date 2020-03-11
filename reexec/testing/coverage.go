@@ -37,16 +37,24 @@ func mergeAndReportCoverages(maincovprof string, childcovprofs []string) {
 	}
 	// Prime summary coverage profile data from this parent's coverage profile
 	// data...
-	mergedname := toOutputDir(maincovprof)
-	mergeCoverageFile(mergedname, &sumcp)
-	// ...and then merge in the re-executed children's coverage profile data.
+	mergeCoverageFile(toOutputDir(maincovprof), &sumcp)
+	// ...then merge in the re-executed children's coverage profile data, and
+	// write the results into a file.
+	mergeWithCoverProfileAndReport(&sumcp, childcovprofs, maincovprof)
+}
+
+// mergeWithCoverProfileAndReport takes a coverage profile, merges in other
+// coverage profile data files, and then writes the summary coverage profile
+// data to the specified file.
+func mergeWithCoverProfileAndReport(sumcp *coverageProfile, childcovprofs []string, mergedname string) {
+	// Merge in other coverage profile data files (typically created by
+	// re-executed child processes).
 	for _, coverprofilename := range childcovprofs {
-		fname := toOutputDir(coverprofilename)
-		mergeCoverageFile(fname, &sumcp)
+		mergeCoverageFile(toOutputDir(coverprofilename), sumcp)
 	}
 	// Finally dump the summary coverage profile data onto the parent's
 	// coverage profile data, overwriting it.
-	f, err := os.Create(mergedname)
+	f, err := os.Create(toOutputDir(mergedname))
 	if err != nil {
 		panic("cannot report summary coverage profile data: " + err.Error())
 	}

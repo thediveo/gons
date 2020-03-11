@@ -27,7 +27,7 @@ import (
 // coverage profile file.
 type M struct {
 	*gotesting.M
-	SkipCleanup bool
+	skipCleanup bool
 }
 
 // Run runs the tests and for the parent process then correctly merges the
@@ -35,13 +35,22 @@ type M struct {
 // process' coverage profile data. Run returns an exit code to pass to
 // os.Exit.
 func (m *M) Run() (exitcode int) {
+	exitcode, _ = m.run()
+	return
+}
+
+// run is the internal implementation of the public Run() method, and
+// additionally returns an indication of whether we were running as the parent
+// process or a re-executed child process. This indication is used by
+// TestMainWithCoverage() to correctly update coverage data to also include
+// almost complete coverage of our M.run() code.
+func (m *M) run() (exitcode int, reexeced bool) {
 	// If necessary, run the action first, as this gathers the coverage
 	// profile data during re-execution, which we are interested in. Please
 	// note that we cannot use gons.reexec.RunAction() directly, as this would
 	// result in an import cycle. To break this vicious cycle we use
 	// testsupport's RunAction instead, which gons.reexec will initialize to
 	// point to its real implementation of RunAction.
-	reexeced := false
 	var recovered interface{}
 	func() {
 		// RunAction() panics when it is asked to run a non-registered action.
@@ -69,7 +78,16 @@ func (m *M) Run() (exitcode int) {
 	// tests executed multiple times and panic when hitting a recursive
 	// reexec.ForkReexec() call.
 	if !reexeced {
-		exitcode = m.M.Run()
+		// testing's M.Run() will write the coverage report even when a test
+		// panics. And since tests might have used reexec.ForkReexec() we
+		// should merge any child coverage profile data results with what
+		// M.Run() reported.
+		func() {
+			defer func() {
+				recovered = recover()
+			}()
+			exitcode = m.M.Run()
+		}()
 		// For the parent we finally need to gather the coverage profile data
 		// written by the individual re-executed child processes, and merge it
 		// with our own coverage profile data. Our data has been written at the
@@ -77,11 +95,15 @@ func (m *M) Run() (exitcode int) {
 		if coverProfile != "" && exitcode == 0 {
 			mergeAndReportCoverages(coverProfile, testsupport.CoverageProfiles)
 			// Now clean up!
-			if !m.SkipCleanup {
+			if !m.skipCleanup {
 				for _, coverprof := range testsupport.CoverageProfiles {
 					_ = os.Remove(toOutputDir(coverprof))
 				}
 			}
+		}
+		if recovered != nil {
+			// Recover panic!!!
+			panic(recovered)
 		}
 	} else {
 		// Run the empty test set when we're an re-executed child, so that the

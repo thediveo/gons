@@ -15,7 +15,6 @@
 package reexec
 
 import (
-	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -27,9 +26,10 @@ import (
 // re-execution, wo go for TestMain instead of an ordinary TextXxx function
 // when unit-testing this package.
 func TestMain(m *testing.M) {
-	// We eat our own dog (testing) food here...
-	mm := &rxtst.M{M: m}
-	os.Exit(mm.Run())
+	// Do NOT USE rxtst.TestMainWithCoverage in your own tests. Use instead:
+	//   mm := &rxtst.M{M: m}
+	//   os.Exit(mm.Run())
+	rxtst.TestMainWithCoverage(m)
 }
 
 func TestPackage(t *testing.T) {

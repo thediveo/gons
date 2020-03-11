@@ -46,7 +46,9 @@ var _ = Describe("gons", func() {
 	It("aborts re-execution for invalid namespace reference", func() {
 		Expect(reexec.ForkReexec("foo", []reexec.Namespace{
 			{Type: "net", Path: "/foo"},
-		}, nil)).To(MatchError(MatchRegexp(`x`)))
+		}, nil)).To(MatchError(MatchRegexp(
+			`.* ForkReexec: child failed with stderr message: ` +
+				`.* invalid gons_net reference .*`)))
 	})
 
 	// Re-execute and switch into other namespaces especially created for this
