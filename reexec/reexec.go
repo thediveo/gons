@@ -111,6 +111,15 @@ type Namespace struct {
 // output of the child gets deserialized as JSON into the passed result
 // element. The call returns after the child process has terminated.
 func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (err error) {
+	return ForkReexecEnv(actionname, namespaces, nil, result)
+}
+
+// ForkReexecEnv restarts the application using reexec as a new child process
+// and then immediately executes only the specified action (actionname),
+// passing additional environment variables to the child. The output of the
+// child gets deserialized as JSON into the passed result element. The call
+// returns after the child process has terminated.
+func ForkReexecEnv(actionname string, namespaces []Namespace, envvars []string, result interface{}) (err error) {
 	// Safeguard against applications trying to run more elaborate discoveries
 	// and are forgetting to enable the required re-execution of themselves by
 	// calling CheckAction() very early in their runtime live.
@@ -144,7 +153,7 @@ func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (
 	// Prepare a fork/re-execution of ourselves, which then switches itself
 	// into the required namespace(s) before its Go runtime spins up.
 	forkchild := exec.Command("/proc/self/exe", testargs...)
-	forkchild.Env = os.Environ()
+	forkchild.Env = append(os.Environ(), envvars...)
 	// Pass the namespaces the fork/child should switch into via the
 	// soon-to-be child's environment. The sequence of the namespaces slice is
 	// kept, so that the caller has control of the exact sequence of namespace
