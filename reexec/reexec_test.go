@@ -37,6 +37,9 @@ func init() {
 		// Return something the parent process didn't expect.
 		fmt.Fprintln(os.Stdout, `42`)
 	})
+	Register("envvar", func() {
+		fmt.Fprintf(os.Stdout, "%q\n", os.Getenv("foobar"))
+	})
 	Register("reexec", func() {
 		_ = ForkReexec("reexec", []Namespace{}, nil)
 	})
@@ -61,6 +64,12 @@ var _ = Describe("reexec", func() {
 		var s string
 		Expect(ForkReexec("action", []Namespace{}, &s)).NotTo(HaveOccurred())
 		Expect(s).To(Equal("done"))
+	})
+
+	It("runs action and passes env var", func() {
+		var s string
+		Expect(ForkReexecEnv("envvar", []Namespace{}, []string{"foobar=baz!"}, &s)).NotTo(HaveOccurred())
+		Expect(s).To(Equal("baz!"))
 	})
 
 	It("panics when re-execution wasn't properly enabled", func() {
