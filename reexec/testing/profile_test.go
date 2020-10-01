@@ -15,6 +15,8 @@
 package testing
 
 import (
+	"os"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -22,6 +24,10 @@ import (
 var _ = Describe("coverage profile data", func() {
 
 	It("rejects invalid coverage profile data files", func() {
+		if os.Getegid() == 0 {
+			Skip("only non-root")
+		}
+
 		cp := newCoverageProfile()
 		Expect(func() { mergeCoverageFile("test/nonexisting.cov", cp) }).NotTo(Panic())
 		Expect(cp.Sources).To(BeEmpty())
