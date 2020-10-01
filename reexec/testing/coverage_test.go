@@ -60,6 +60,9 @@ var _ = Describe("coveraging re-execution", func() {
 	})
 
 	It("panics on read-only coverage report", func() {
+		if os.Getegid() == 0 {
+			Skip("only non-root")
+		}
 		tmpdir, err := ioutil.TempDir("", "covreport")
 		Expect(err).NotTo(HaveOccurred())
 		defer os.RemoveAll(tmpdir)

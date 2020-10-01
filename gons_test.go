@@ -23,8 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/thediveo/gons"
 	"github.com/thediveo/gons/reexec"
-	"github.com/thediveo/lxkns/nstypes"
-	"github.com/thediveo/lxkns/relations"
+	"github.com/thediveo/lxkns/ops"
 	"github.com/thediveo/testbasher"
 )
 
@@ -33,8 +32,8 @@ func init() {
 	reexec.Register("enter", func() {
 		ns := []string{}
 		for _, t := range []string{"user", "mnt", "net"} {
-			nsid, _ := relations.ID("/proc/self/ns/" + t)
-			ns = append(ns, fmt.Sprintf("%d", nsid))
+			nsid, _ := ops.NamespacePath("/proc/self/ns/" + t).ID()
+			ns = append(ns, fmt.Sprintf("%d", nsid.Ino))
 		}
 		fmt.Fprintln(os.Stdout, "[", strings.Join(ns, ","), "]")
 	})
@@ -68,16 +67,17 @@ read # wait for Proceed()
 		cmd := b.Start("unshare")
 		defer cmd.Close()
 		var userns, mntns, netns string
+		// read the filesystem path references to newly created namespaces.
 		cmd.Decode(&userns)
 		cmd.Decode(&mntns)
 		cmd.Decode(&netns)
-		var ns []nstypes.NamespaceID
+		var nsids []uint64
 		Expect(reexec.ForkReexec("enter", []reexec.Namespace{
 			{Type: "!user", Path: userns},
 			{Type: "!mnt", Path: mntns},
 			{Type: "!net", Path: netns},
-		}, &ns)).ToNot(HaveOccurred())
-		Expect(ns).To(Equal([]nstypes.NamespaceID{
+		}, &nsids)).ToNot(HaveOccurred())
+		Expect(nsids).To(Equal([]uint64{
 			ID(userns),
 			ID(mntns),
 			ID(netns),
@@ -93,7 +93,7 @@ read # wait for Proceed()
 
 })
 
-func ID(p string) nstypes.NamespaceID {
-	id, _ := relations.ID(p)
-	return id
+func ID(p string) uint64 {
+	id, _ := ops.NamespacePath(p).ID()
+	return id.Ino
 }
