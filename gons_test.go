@@ -43,10 +43,13 @@ var _ = Describe("gons", func() {
 
 	// Re-execute with an invalid namespace reference.
 	It("aborts re-execution for invalid namespace reference", func() {
-		Expect(reexec.ForkReexec("foo", []reexec.Namespace{
-			{Type: "net", Path: "/foo"},
-		}, nil)).To(MatchError(MatchRegexp(
-			`.* ForkReexec: child failed with stderr message: ` +
+		Expect(reexec.RunReexecAction(
+			"foo",
+			reexec.Namespaces([]reexec.Namespace{
+				{Type: "net", Path: "/foo"},
+			}),
+		)).To(MatchError(MatchRegexp(
+			`.* ReexecAction.Run: child failed with stderr message: ` +
 				`.* invalid gons_net reference .*`)))
 	})
 
@@ -72,11 +75,15 @@ read # wait for Proceed()
 		cmd.Decode(&mntns)
 		cmd.Decode(&netns)
 		var nsids []uint64
-		Expect(reexec.ForkReexec("enter", []reexec.Namespace{
-			{Type: "!user", Path: userns},
-			{Type: "!mnt", Path: mntns},
-			{Type: "!net", Path: netns},
-		}, &nsids)).ToNot(HaveOccurred())
+		Expect(reexec.RunReexecAction(
+			"enter",
+			reexec.Namespaces([]reexec.Namespace{
+				{Type: "!user", Path: userns},
+				{Type: "!mnt", Path: mntns},
+				{Type: "!net", Path: netns},
+			}),
+			reexec.Result(&nsids),
+		)).ToNot(HaveOccurred())
 		Expect(nsids).To(Equal([]uint64{
 			ID(userns),
 			ID(mntns),

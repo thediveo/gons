@@ -106,35 +106,93 @@ type Namespace struct {
 	Path string // path reference to namespace in filesystem.
 }
 
-// ForkReexec restarts the application using reexec as a new child process and
-// then immediately executes only the specified action (actionname). The
-// output of the child gets deserialized as JSON into the passed result
-// element. The call returns after the child process has terminated.
-func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (err error) {
-	return ForkReexecEnv(actionname, namespaces, nil, result)
+// ReexecAction describes a named action to be re-executed in a forked child
+// copy of this process, together with its mandatory parameters and options.
+type ReexecAction struct {
+	ActionName  string      // name of action to run in re-executed child.
+	Namespaces  []Namespace // namespaces to switch into before executing action.
+	Param       interface{} // optional parameter to be sent to the action.
+	Result      interface{} // where to put the action result to.
+	Environment []string    // optional environment variables to pass to re-executed child.
 }
 
-// ForkReexecEnv restarts the application using reexec as a new child process
-// and then immediately executes only the specified action (actionname),
-// passing additional environment variables to the child. The output of the
-// child gets deserialized as JSON into the passed result element. The call
-// returns after the child process has terminated.
-func ForkReexecEnv(actionname string, namespaces []Namespace, envvars []string, result interface{}) (err error) {
+// ReexecActionOption is an option function configuring some aspect of a
+// ReexecAction object. It can be passed to NewReexecAction when creating a
+// named action to be re-executed in a forked child copy of our process.
+type ReexecActionOption func(*ReexecAction)
+
+// NewReexecAction returns a new ReexecAction object, tailored according to the
+// additionally specified options.
+func NewReexecAction(actionname string, options ...ReexecActionOption) *ReexecAction {
+	a := &ReexecAction{
+		ActionName: actionname,
+	}
+	for _, opt := range options {
+		opt(a)
+	}
+	return a
+}
+
+// RunExecAction runs the named action in a forked and re-executed child copy of
+// this process with the specified options and returns only after the action in
+// the child has finished.
+func RunReexecAction(actionname string, options ...ReexecActionOption) error {
+	return NewReexecAction(actionname, options...).Run()
+}
+
+// Namespaces specifies the namespaces an (re-executed) named action is to be
+// run in.
+func Namespaces(namespaces []Namespace) ReexecActionOption {
+	return func(a *ReexecAction) {
+		a.Namespaces = namespaces
+	}
+}
+
+// Param specifies an (optional) parameter to be sent to the (re-executed) named
+// action.
+func Param(param interface{}) ReexecActionOption {
+	return func(a *ReexecAction) {
+		a.Param = param
+	}
+}
+
+// Result specifies where to place the result received from the (re-executed)
+// named action.
+func Result(result interface{}) ReexecActionOption {
+	return func(a *ReexecAction) {
+		a.Result = result
+	}
+}
+
+// Environment specifies (optional) environment variables passed to the
+// (re-executed) named action.
+func Environment(environment []string) ReexecActionOption {
+	return func(a *ReexecAction) {
+		a.Environment = environment
+	}
+}
+
+// Run restarts the application using reexec and thus as a new child process,
+// then immediately executes only the this named action. It optionally passes a
+// parameter (as JSON) and/or additional environment variables to the child. The
+// output of the child gets deserialized as JSON into the passed result element.
+// The call only returns after the child process has terminated.
+func (a *ReexecAction) Run() (err error) {
 	// Safeguard against applications trying to run more elaborate discoveries
 	// and are forgetting to enable the required re-execution of themselves by
 	// calling CheckAction() very early in their runtime live.
 	if !reexecEnabled {
 		if actionname := os.Getenv(magicEnvVar); actionname == "" {
-			panic("gons/reexec: ForkReexec: application does not support " +
+			panic("gons/reexec: ReexecAction.Run: application does not support " +
 				"forking and restarting, needs to call reexec.CheckAction() " +
 				"first before running discovery")
 		}
-		panic("gons/reexec: ForkReexec: tried to re-execute in " +
+		panic("gons/reexec: ReexecAction.Run: tried to re-execute in " +
 			"already re-executing child process")
 	}
-	if _, ok := actions[actionname]; !ok {
-		panic("gons/reexec: ForkReexec: attempting to re-execute into " +
-			"unregistered action \"" + actionname + "\"")
+	if _, ok := actions[a.ActionName]; !ok {
+		panic("gons/reexec: ReexecAction.Run: attempting to re-execute into " +
+			"unregistered action \"" + a.ActionName + "\"")
 	}
 	// If testing has been enabled, then make sure to pass the necessary
 	// parameters on to our child processes, as it will (have to) use a
@@ -153,13 +211,13 @@ func ForkReexecEnv(actionname string, namespaces []Namespace, envvars []string, 
 	// Prepare a fork/re-execution of ourselves, which then switches itself
 	// into the required namespace(s) before its Go runtime spins up.
 	forkchild := exec.Command("/proc/self/exe", testargs...)
-	forkchild.Env = append(os.Environ(), envvars...)
+	forkchild.Env = append(os.Environ(), a.Environment...)
 	// Pass the namespaces the fork/child should switch into via the
 	// soon-to-be child's environment. The sequence of the namespaces slice is
 	// kept, so that the caller has control of the exact sequence of namespace
 	// switches.
 	ooorder := []string{} // cSpell:ignore ooorder
-	for _, ns := range namespaces {
+	for _, ns := range a.Namespaces {
 		ooorder = append(ooorder, ns.Type)
 		forkchild.Env = append(forkchild.Env,
 			fmt.Sprintf("gons_%s=%s", strings.TrimPrefix(ns.Type, "!"), ns.Path))
@@ -167,20 +225,20 @@ func ForkReexecEnv(actionname string, namespaces []Namespace, envvars []string, 
 	forkchild.Env = append(forkchild.Env, "gons_order="+strings.Join(ooorder, ","))
 	// Finally set the action to run on restarting our fork, and then try to
 	// start our re-executed fork child...
-	forkchild.Env = append(forkchild.Env, magicEnvVar+"="+actionname)
+	forkchild.Env = append(forkchild.Env, magicEnvVar+"="+a.ActionName)
 	childout, err := forkchild.StdoutPipe()
 	if err != nil {
-		panic(fmt.Sprintf("gons/reexec: ForkReexec: cannot prepare for restart my fork, %s", err.Error()))
+		panic(fmt.Sprintf("gons/reexec: ReexecAction.Run: cannot prepare for restart my fork, %s", err.Error()))
 	}
 	defer childout.Close()
 	var childerr bytes.Buffer
 	forkchild.Stderr = &childerr
 	decoder := json.NewDecoder(childout)
 	if err := forkchild.Start(); err != nil {
-		panic(fmt.Sprintf("gons/reexec: ForkReexec: cannot restart a fork of myself"))
+		panic("gons/reexec: ReexecAction.Run: cannot restart a fork of myself")
 	}
 	// Decode the result as it flows in. Keep any error for later...
-	decodererr := decoder.Decode(result)
+	decodererr := decoder.Decode(a.Result)
 	// Either wait for the child to automatically terminate within a short
 	// grace period after we deserialized its result output, or kill it the
 	// hard way if it can't terminate in time.
@@ -199,15 +257,44 @@ func ForkReexecEnv(actionname string, namespaces []Namespace, envvars []string, 
 	childhiccup := childerr.String()
 	if childhiccup != "" {
 		return fmt.Errorf(
-			"gons/reexec: ForkReexec: child failed with stderr message: %q",
+			"gons/reexec: ReexecAction.Run: child failed with stderr message: %q",
 			childhiccup)
 	}
 	if decodererr != nil {
 		return fmt.Errorf(
-			"gons/reexec: ForkReexec: cannot decode child result, %q",
+			"gons/reexec: ReexecAction.Run: cannot decode child result, %q",
 			decodererr.Error())
 	}
 	return err
+}
+
+// ForkReexec restarts the application using reexec as a new child process and
+// then immediately executes only the specified action (actionname). The output
+// of the child gets deserialized as JSON into the passed result element. The
+// call returns after the child process has terminated.
+//
+// Deprecated: use RunReexecAction("foo", Namespaces(n), Result(r)) instead.
+func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (err error) {
+	return RunReexecAction(
+		actionname,
+		Namespaces(namespaces),
+		Result(result))
+}
+
+// ForkReexecEnv restarts the application using reexec as a new child process
+// and then immediately executes only the specified action (actionname), passing
+// additional environment variables to the child. The output of the child gets
+// deserialized as JSON into the passed result element. The call returns after
+// the child process has terminated.
+//
+// Deprecated: use RunReexecAction("foo", Namespaces(n), Environment(env),
+// Result(r)) instead.
+func ForkReexecEnv(actionname string, namespaces []Namespace, envvars []string, result interface{}) (err error) {
+	return RunReexecAction(
+		actionname,
+		Namespaces(namespaces),
+		Environment(envvars),
+		Result(result))
 }
 
 // Action is a function that is run on demand during re-execution of a forked

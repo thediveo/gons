@@ -94,7 +94,7 @@ var _ = Describe("reexec", func() {
 		Expect(func() { Register("barx", func() {}) }).NotTo(Panic())
 		err := ForkReexec("barx", []Namespace{}, nil)
 		Expect(err).To(MatchError(MatchRegexp(
-			`.* ForkReexec: child failed with stderr message: ` +
+			`.* ReexecAction.Run: child failed with stderr message: ` +
 				`"unregistered .* action .*\\"barx\\""`)))
 	})
 
@@ -105,18 +105,18 @@ var _ = Describe("reexec", func() {
 		// there are problems entering namespaces.
 		Expect(ForkReexec("action", []Namespace{
 			{Type: "user", Path: "/proc/self/ns/user"},
-		}, nil)).To(MatchError(MatchRegexp(`ForkReexec: child failed with stderr message: .* cannot join`)))
+		}, nil)).To(MatchError(MatchRegexp(`ReexecAction.Run: child failed with stderr message: .* cannot join`)))
 	})
 
 	It("doesn't re-execute from a re-executed child", func() {
 		Expect(ForkReexec("reexec", []Namespace{}, nil)).To(
-			MatchError(MatchRegexp(`ForkReexec: child failed with stderr message: .* tried to re-execute`)))
+			MatchError(MatchRegexp(`ReexecAction.Run: child failed with stderr message: .* tried to re-execute`)))
 	})
 
 	It("panics on un-decodable child result", func() {
 		var s string
 		Expect(ForkReexec("unintelligible", []Namespace{}, &s)).To(
-			MatchError(MatchRegexp(`ForkReexec: cannot decode child result`)))
+			MatchError(MatchRegexp(`ReexecAction.Run: cannot decode child result`)))
 	})
 
 	It("terminates a hanging re-executed child", func() {
