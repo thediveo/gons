@@ -49,8 +49,8 @@ var _ = Describe("gons", func() {
 				{Type: "net", Path: "/foo"},
 			}),
 		)).To(MatchError(MatchRegexp(
-			`.* ReexecAction.Run: child failed with stderr message: ` +
-				`.* invalid gons_net reference .*`)))
+			`.* ReexecAction.Run: child failed with stderr message ` +
+				`".* invalid gons_net reference .*`)))
 	})
 
 	// Re-execute and switch into other namespaces especially created for this

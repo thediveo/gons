@@ -15,7 +15,9 @@
 package reexec
 
 import (
+	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"time"
 
@@ -39,6 +41,14 @@ func init() {
 	})
 	Register("envvar", func() {
 		fmt.Fprintf(os.Stdout, "%q\n", os.Getenv("foobar"))
+	})
+	Register("withparam", func() {
+		var param string
+		if err := json.NewDecoder(os.Stdin).Decode(&param); err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
+			return
+		}
+		fmt.Fprintf(os.Stdout, "%q\n", "xx"+param)
 	})
 	Register("reexec", func() {
 		_ = ForkReexec("reexec", []Namespace{}, nil)
@@ -72,6 +82,17 @@ var _ = Describe("reexec", func() {
 		Expect(s).To(Equal("baz!"))
 	})
 
+	It("runs action with parameter", func() {
+		var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+		p := make([]rune, 8192)
+		for i := range p {
+			p[i] = letters[rand.Intn(len(letters))]
+		}
+		var r string
+		Expect(RunReexecAction("withparam", Param(string(p)), Result(&r))).NotTo(HaveOccurred())
+		Expect(r).To(Equal("xx" + string(p)))
+	})
+
 	It("panics when re-execution wasn't properly enabled", func() {
 		defer func(old bool) { reexecEnabled = old }(reexecEnabled)
 		reexecEnabled = false
@@ -94,7 +115,7 @@ var _ = Describe("reexec", func() {
 		Expect(func() { Register("barx", func() {}) }).NotTo(Panic())
 		err := ForkReexec("barx", []Namespace{}, nil)
 		Expect(err).To(MatchError(MatchRegexp(
-			`.* ReexecAction.Run: child failed with stderr message: ` +
+			`.* ReexecAction.Run: child failed with stderr message ` +
 				`"unregistered .* action .*\\"barx\\""`)))
 	})
 
@@ -105,12 +126,12 @@ var _ = Describe("reexec", func() {
 		// there are problems entering namespaces.
 		Expect(ForkReexec("action", []Namespace{
 			{Type: "user", Path: "/proc/self/ns/user"},
-		}, nil)).To(MatchError(MatchRegexp(`ReexecAction.Run: child failed with stderr message: .* cannot join`)))
+		}, nil)).To(MatchError(MatchRegexp(`ReexecAction.Run: child failed with stderr message \".* cannot join`)))
 	})
 
 	It("doesn't re-execute from a re-executed child", func() {
 		Expect(ForkReexec("reexec", []Namespace{}, nil)).To(
-			MatchError(MatchRegexp(`ReexecAction.Run: child failed with stderr message: .* tried to re-execute`)))
+			MatchError(MatchRegexp(`ReexecAction.Run: child failed with stderr message \".* tried to re-execute`)))
 	})
 
 	It("panics on un-decodable child result", func() {

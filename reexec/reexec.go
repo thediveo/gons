@@ -226,9 +226,18 @@ func (a *ReexecAction) Run() (err error) {
 	// Finally set the action to run on restarting our fork, and then try to
 	// start our re-executed fork child...
 	forkchild.Env = append(forkchild.Env, magicEnvVar+"="+a.ActionName)
+	var encoder *json.Encoder
+	if a.Param != nil {
+		childin, err := forkchild.StdinPipe()
+		if err != nil {
+			panic(fmt.Sprintf("gons/reexec: ReexecAction.Run: cannot prepare for restarting my fork, %s", err.Error()))
+		}
+		defer childin.Close()
+		encoder = json.NewEncoder(childin)
+	}
 	childout, err := forkchild.StdoutPipe()
 	if err != nil {
-		panic(fmt.Sprintf("gons/reexec: ReexecAction.Run: cannot prepare for restart my fork, %s", err.Error()))
+		panic(fmt.Sprintf("gons/reexec: ReexecAction.Run: cannot prepare for restarting my fork, %s", err.Error()))
 	}
 	defer childout.Close()
 	var childerr bytes.Buffer
@@ -237,8 +246,18 @@ func (a *ReexecAction) Run() (err error) {
 	if err := forkchild.Start(); err != nil {
 		panic("gons/reexec: ReexecAction.Run: cannot restart a fork of myself")
 	}
-	// Decode the result as it flows in. Keep any error for later...
-	decodererr := decoder.Decode(a.Result)
+	// Sent the optional parameter, if any...
+	var encodererr error
+	if encoder != nil {
+		encodererr = encoder.Encode(a.Param)
+	}
+	// Decode the result as it flows in. Keep any error for later. Skip this
+	// step if we had an encoder error already, as the action won't have got its
+	// paremeters correctly.
+	var decodererr error
+	if encodererr == nil {
+		decodererr = decoder.Decode(a.Result)
+	}
 	// Either wait for the child to automatically terminate within a short
 	// grace period after we deserialized its result output, or kill it the
 	// hard way if it can't terminate in time.
@@ -251,13 +270,19 @@ func (a *ReexecAction) Run() (err error) {
 	case <-time.After(1 * time.Second):
 		_ = forkchild.Process.Kill()
 	}
-	// Any child stderr output takes precedence over decoder errors, as when
-	// the child panics, then that is of more importance than any hiccup the
-	// result decoder encounters due to the child's problems.
+	// Any child stderr output takes precedence over decoder errors, as when the
+	// child panics, then that is of more importance than any hiccup the result
+	// decoder encounters due to the child's problems. However, any encoder
+	// error takes it all...
+	if encodererr != nil {
+		return fmt.Errorf(
+			"gons/reexec: ReexecAction.Run: cannot send parameter to child, %q",
+			decodererr.Error())
+	}
 	childhiccup := childerr.String()
 	if childhiccup != "" {
 		return fmt.Errorf(
-			"gons/reexec: ReexecAction.Run: child failed with stderr message: %q",
+			"gons/reexec: ReexecAction.Run: child failed with stderr message %q",
 			childhiccup)
 	}
 	if decodererr != nil {
