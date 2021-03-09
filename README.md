@@ -1,6 +1,6 @@
 # gons
 
-[![GoDoc](https://godoc.org/github.com/TheDiveO/gons?status.svg)](http://godoc.org/github.com/TheDiveO/gons)
+[![Go Reference](https://pkg.go.dev/badge/godoc.org/github.com/TheDiveO/gons.svg)](https://pkg.go.dev/godoc.org/github.com/TheDiveO/gons)
 [![GitHub](https://img.shields.io/github/license/thediveo/gons)](https://img.shields.io/github/license/thediveo/gons)
 ![build and test](https://github.com/TheDiveO/gons/workflows/build%20and%20test/badge.svg?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/thediveo/gons)](https://goreportcard.com/report/github.com/thediveo/gons)
@@ -90,13 +90,13 @@ func init() {
 
 func main() {
   var answer int
-  exec.ForkReexec("answertoeverything", []Namespace{}, &s)
+  reexec.RunReexecAction("answertoeverything", reexec.Result(&s))
   fmt.Printf("answer: %d\n", answer)
 }
 ```
 
 - `reexec.Register` registers an action with its name and the code to execute.
-- `reexec.ForkReexec` forks and re-executes itself as a child process,
+- `reexec.RunReexecAction` forks and re-executes itself as a child process,
   triggering the named action. It then picks up the result, which the action
   has to print to `os.Stdout` in JSON format, and prints the result.
 
@@ -128,5 +128,5 @@ merge it with the main process' coverage profile data.
 
 ## Copyright and License
 
-`gons` is Copyright 2019 Harald Albrecht, and licensed under the Apache
+`gons` is Copyright 2019, 2021 Harald Albrecht, and licensed under the Apache
 License, Version 2.0.

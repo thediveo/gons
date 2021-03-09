@@ -35,8 +35,14 @@ returned to the parent process which initiated the re-execution.
   func main() {
       reexec.CheckAction()
       var result string
-      _ = reexec.ForkReexec("action", []reexec.Namespace{}, &result)
+      _ = reexec.RunReexecAction(
+        "action",
+        reexec.Result(&result))
   }
+
+Please note that reexec.RunReexecAction() optionally accepts the namespaces to
+run the action in, as well as a parameter and/or environment variables. The
+result is picked up in the variable specified using reexec.Result().
 
 */
 package reexec

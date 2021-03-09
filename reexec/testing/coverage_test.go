@@ -46,7 +46,10 @@ var _ = Describe("coveraging re-execution", func() {
 
 	It("re-executes action foo self-test", func() {
 		var result string
-		Expect(reexec.ForkReexec("foo", nil, &result)).To(Succeed())
+		Expect(reexec.RunReexecAction(
+			"foo",
+			reexec.Result(&result),
+		)).To(Succeed())
 	})
 
 	It("outputs to directory", func() {
