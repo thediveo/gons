@@ -11,6 +11,6 @@ require (
 	github.com/thediveo/lxkns v0.15.2
 	github.com/thediveo/testbasher v1.0.2
 	golang.org/x/net v0.0.0-20200930145003-4acb6c075d10 // indirect
-	golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f // indirect
+	golang.org/x/sys v0.1.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b // indirect
 )
