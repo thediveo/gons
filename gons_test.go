@@ -19,12 +19,13 @@ import (
 	"os"
 	"strings"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"github.com/thediveo/gons"
 	"github.com/thediveo/gons/reexec"
 	"github.com/thediveo/lxkns/ops"
 	"github.com/thediveo/testbasher"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 func init() {

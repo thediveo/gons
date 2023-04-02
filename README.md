@@ -4,6 +4,7 @@
 [![GitHub](https://img.shields.io/github/license/thediveo/gons)](https://img.shields.io/github/license/thediveo/gons)
 ![build and test](https://github.com/TheDiveO/gons/workflows/build%20and%20test/badge.svg?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/thediveo/gons)](https://goreportcard.com/report/github.com/thediveo/gons)
+![Coverage](https://img.shields.io/badge/Coverage-82.9%25-brightgreen)
 
 ## gons
 
@@ -128,5 +129,5 @@ merge it with the main process' coverage profile data.
 
 ## Copyright and License
 
-`gons` is Copyright 2019, 2021 Harald Albrecht, and licensed under the Apache
+`gons` is Copyright 2019-23 Harald Albrecht, and licensed under the Apache
 License, Version 2.0.
