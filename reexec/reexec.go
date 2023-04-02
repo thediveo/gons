@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -226,22 +227,44 @@ func (a *ReexecAction) Run() (err error) {
 	// Finally set the action to run on restarting our fork, and then try to
 	// start our re-executed fork child...
 	forkchild.Env = append(forkchild.Env, magicEnvVar+"="+a.ActionName)
+	// If necessary, prepare a JSON encode to send input data to the child
+	// process via the child's stdin.
 	var encoder *json.Encoder
 	if a.Param != nil {
 		childin, err := forkchild.StdinPipe()
 		if err != nil {
-			panic(fmt.Sprintf("gons/reexec: ReexecAction.Run: cannot prepare for restarting my fork, %s", err.Error()))
+			panic(fmt.Sprintf(
+				"gons/reexec: ReexecAction.Run: cannot prepare for restarting my fork, reason: %s",
+				err.Error()))
 		}
 		defer childin.Close()
 		encoder = json.NewEncoder(childin)
 	}
+	// Get the stdout pipe from the child.
 	childout, err := forkchild.StdoutPipe()
 	if err != nil {
-		panic(fmt.Sprintf("gons/reexec: ReexecAction.Run: cannot prepare for restarting my fork, %s", err.Error()))
+		panic(fmt.Sprintf(
+			"gons/reexec: ReexecAction.Run: cannot prepare for restarting my fork, reason: %s",
+			err.Error()))
 	}
 	defer childout.Close()
+	// Get the stderr pipe from the child and collect any data we might receive.
+	// Unfortunately, we can't use the buffer writer directly without further
+	// measures as this creates a race condition in those situations where we
+	// need to kill the child process: we need to know when the stderr pipe has
+	// been closed.
 	var childerr bytes.Buffer
-	forkchild.Stderr = &childerr
+	errpipe, err := forkchild.StderrPipe()
+	if err != nil {
+		panic(fmt.Sprintf(
+			"gons/reexec: ReexecAction.Run: cannot prepare for restarting my fork, reason: %s",
+			err.Error()))
+	}
+	errdone := make(chan struct{}, 1)
+	go func() {
+		defer close(errdone)
+		io.Copy(&childerr, errpipe)
+	}()
 	decoder := json.NewDecoder(childout)
 	if err := forkchild.Start(); err != nil {
 		panic("gons/reexec: ReexecAction.Run: cannot restart a fork of myself")
@@ -270,14 +293,17 @@ func (a *ReexecAction) Run() (err error) {
 	case <-time.After(1 * time.Second):
 		_ = forkchild.Process.Kill()
 	}
+	// Wait for the stderr pipe to properly wind down, so we got all that there
+	// is to get.
+	<-errdone
 	// Any child stderr output takes precedence over decoder errors, as when the
 	// child panics, then that is of more importance than any hiccup the result
 	// decoder encounters due to the child's problems. However, any encoder
 	// error takes it all...
 	if encodererr != nil {
 		return fmt.Errorf(
-			"gons/reexec: ReexecAction.Run: cannot send parameter to child, %q",
-			decodererr.Error())
+			"gons/reexec: ReexecAction.Run: cannot send parameter to child, reason: %w",
+			decodererr)
 	}
 	childhiccup := childerr.String()
 	if childhiccup != "" {
@@ -287,8 +313,8 @@ func (a *ReexecAction) Run() (err error) {
 	}
 	if decodererr != nil {
 		return fmt.Errorf(
-			"gons/reexec: ReexecAction.Run: cannot decode child result, %q",
-			decodererr.Error())
+			"gons/reexec: ReexecAction.Run: cannot decode child result, reason: %w",
+			decodererr)
 	}
 	return err
 }

@@ -1,29 +1,28 @@
 /*
-
 Package gons ("go [into] namespaces") selectively switches your Go application
 into other already existing Linux namespaces. This must happen before the Go
 runtime spins up, because the Go runtime later unintentionally blocks certain
 namespace changes, especially changing into a different mount namespace when
 running with multiple OS threads.
 
-Using gons in Your Code
+# Using gons in Your Code
 
 Simply import the gons package into your application, and you're almost set.
 In your application's main() you should check that there were no errors
 switching namespaces.
 
-  package main
+	package main
 
-  import _ "github.com/thediveo/gons"
+	import _ "github.com/thediveo/gons"
 
-  func main() {
-    if err := Status(); err != nil {
-      panic(err.Error())
-    }
-    // ...
-  }
+	func main() {
+	  if err := Status(); err != nil {
+	    panic(err.Error())
+	  }
+	  // ...
+	}
 
-Telling Your Program Which Namespaces to Enter
+# Telling Your Program Which Namespaces to Enter
 
 The existing namespaces to join/switch into are referenced by their paths in
 the filesystem (such as "/proc/123456/ns/mnt"), and are specified using
@@ -32,15 +31,15 @@ that should be switched at startup. These variables need to be set before your
 application is started. The names of the environment variables are as follows
 and must be all lowercase:
 
-  gons_cgroup=...
-  gons_ipc=...
-  gons_mnt=...
-  gons_net=...
-  gons_pid=... # see note below
-  gons_user=...
-  gons_uts=...
+	gons_cgroup=...
+	gons_ipc=...
+	gons_mnt=...
+	gons_net=...
+	gons_pid=... # see note below
+	gons_user=...
+	gons_uts=...
 
-Controlling the Sequence in Which to Enter Namespaces
+# Controlling the Sequence in Which to Enter Namespaces
 
 Additionally, you can specify the order in which the namespaces should be
 switched, as well as when the namespace paths are to be opened: if not
@@ -57,14 +56,14 @@ this namespace. This is mostly of importance when switching the mount
 namespace, as this can also change the filesystem and thus how the namespace
 paths are resolved.
 
-Reexec to the Rescue
+# Reexec to the Rescue
 
 In case your Go application wants to fork and then restart itself in order to
 be able to switch namespaces, you might find the subpackage
 "github.com/thediveo/gons/reexec" useful. It simplifies the overall process and
 takes care of correctly setting the environment variables.
 
-Technical Notes
+# Technical Notes
 
 Setting "gons_pid=..."" does not switch your application's own PID namespace, but
 rather controls the PID namespace any child processes of your application will
@@ -77,6 +76,5 @@ printed to stderr and the application aborted with error code 1.
 The gons package requires cgo (https://golang.org/cmd/cgo/): the required
 namespace switches can only safely be done while your application is still
 single-threaded and that's only the case before the Go runtime is spinning up.
-
 */
 package gons

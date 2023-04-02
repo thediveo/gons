@@ -1,36 +1,27 @@
 name: build and test
 on:
   push:
-    branches:
-    - master
-  create:
-    tags:
-    - 'test-*'
+    branches: [ master ]
+  pull_request:
+    branches: [ master, develop ]
 
 jobs:
-
   buildandtest:
     name: Build and Test on Go ${{matrix.go}}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ['1.16', '1.13']
+        go: [ '1.20', '1.19' ]
+
     steps:
+      - name: Set up Go ${{matrix.go}}
+        uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # pin@v4
+        with:
+          go-version: ${{matrix.go}}
+        id: go
 
-    - name: Set up Go ${{matrix.go}}
-      uses: actions/setup-go@v1
-      with:
-        go-version: ${{matrix.go}}
-      id: go
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # pin@v3
 
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v2
-
-    - name: Get dependencies
-      run: go get -v -t -d ./...
-
-    - name: Build
-      run: go build -v ./...
-
-    - name: Test
-      run: go test -v ./...
+      - name: Test Go packages
+        run: go test -v -race -p=1 -count=1 ./...

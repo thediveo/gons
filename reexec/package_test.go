@@ -17,13 +17,14 @@ package reexec
 import (
 	"testing"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	rxtst "github.com/thediveo/gons/reexec/testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 // As we need to do some pre-test checks in order to run actions on
-// re-execution, wo go for TestMain instead of an ordinary TextXxx function
+// re-execution, we go for TestMain instead of an ordinary TextXxx function
 // when unit-testing this package.
 func TestMain(m *testing.M) {
 	// Do NOT USE rxtst.TestMainWithCoverage in your own tests. Use instead:

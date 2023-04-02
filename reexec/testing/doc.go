@@ -1,5 +1,4 @@
 /*
-
 Package testing supports code coverage profiling of applications using the
 gons/reexec package.
 
@@ -12,6 +11,5 @@ finishes its own testing.M.Run(). So we need to run each re-executed child on
 its own coverage profile data file. After testing.M.Run() has finished, we
 then merge the child coverage profile data into the parent's coverage profile
 data file.
-
 */
 package testing
