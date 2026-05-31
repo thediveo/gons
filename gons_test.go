@@ -15,14 +15,18 @@
 package gons_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/thediveo/lxkns/ops"
+	"github.com/thediveo/spacetest/spacer"
+
 	"github.com/thediveo/gons"
 	"github.com/thediveo/gons/reexec"
-	"github.com/thediveo/lxkns/ops"
-	"github.com/thediveo/testbasher"
+
+	"github.com/onsi/gomega/gexec"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,9 +40,13 @@ func init() {
 			nsid, _ := ops.NamespacePath("/proc/self/ns/" + t).ID()
 			ns = append(ns, fmt.Sprintf("%d", nsid.Ino))
 		}
-		fmt.Fprintln(os.Stdout, "[", strings.Join(ns, ","), "]")
+		_, _ = fmt.Fprintln(os.Stdout, "[", strings.Join(ns, ","), "]")
 	})
 }
+
+var _ = AfterSuite(func() {
+	gexec.CleanupBuildArtifacts()
+})
 
 var _ = Describe("gons", func() {
 
@@ -56,25 +64,21 @@ var _ = Describe("gons", func() {
 
 	// Re-execute and switch into other namespaces especially created for this
 	// test.
-	It("switches namespaces when re-executing", func() {
-		b := testbasher.Basher{}
-		defer b.Done()
-		b.Script("unshare", `
-unshare -Umn $printinfo
-`)
-		b.Script("printinfo", `
-for nst in user mnt net; do
-	echo "\"/proc/$$/ns/$nst\""
-done
-read # wait for Proceed()
-`)
-		cmd := b.Start("unshare")
-		defer cmd.Close()
-		var userns, mntns, netns string
-		// read the filesystem path references to newly created namespaces.
-		cmd.Decode(&userns)
-		cmd.Decode(&mntns)
-		cmd.Decode(&netns)
+	It("switches namespaces when re-executing", func(ctx context.Context) {
+		nsref := func(fd int) string {
+			return fmt.Sprintf("/proc/%d/fd/%d", os.Getpid(), fd)
+		}
+
+		spc := spacer.New(ctx, spacer.WithOut(GinkgoWriter), spacer.WithErr(GinkgoWriter))
+		DeferCleanup(spc.Close)
+		subspc, ns := spc.Subspace(true, false)
+		DeferCleanup(subspc.Close)
+		userns := nsref(ns.User)
+
+		morens := subspc.Rooms(false, false, true, true, false, false)
+		mntns := nsref(morens.Mnt)
+		netns := nsref(morens.Net)
+
 		var nsids []uint64
 		Expect(reexec.RunReexecAction(
 			"enter",

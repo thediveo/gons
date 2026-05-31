@@ -1,23 +1,28 @@
 module github.com/thediveo/gons
 
-go 1.19
+go 1.25.8
 
 require (
-	github.com/onsi/ginkgo/v2 v2.13.0
-	github.com/onsi/gomega v1.29.0
-	github.com/thediveo/lxkns v0.28.0
-	github.com/thediveo/testbasher v1.0.7
+	github.com/onsi/ginkgo/v2 v2.29.0
+	github.com/onsi/gomega v1.41.0
+	github.com/thediveo/lxkns v0.44.0
 )
 
+require github.com/dustinkirkland/golang-petname v0.0.0-20260215035315-f0c533e9ce9b // indirect
+
 require (
-	github.com/go-logr/logr v1.2.4 // indirect
-	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/google/pprof v0.0.0-20230602150820-91b7bce49751 // indirect
-	github.com/thediveo/ioctl v0.9.2 // indirect
-	golang.org/x/net v0.17.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
-	golang.org/x/text v0.13.0 // indirect
-	golang.org/x/tools v0.13.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
+	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936 // indirect
+	github.com/thediveo/ioctl v0.9.4 // indirect
+	github.com/thediveo/spacetest v0.12.0
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/mod v0.35.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/tools v0.44.0 // indirect
 )

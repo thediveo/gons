@@ -40,8 +40,8 @@ func pritiPratel(f func()) {
 	os.Stderr = writer
 	defer func() {
 		os.Stderr = realStderr
-		reader.Close()
-		writer.Close()
+		_ = reader.Close()
+		_ = writer.Close()
 	}()
 	// The stdout filter for filtering out unwanted Golang testing messages.
 	// It runs as a separate Go routine, which only terminates on (real) read
@@ -52,7 +52,7 @@ func pritiPratel(f func()) {
 	// rogue lies which we need to suppress. Definitely a Johnson function
 	// here.
 	f()
-	writer.Close()
+	_ = writer.Close()
 	<-done
 }
 

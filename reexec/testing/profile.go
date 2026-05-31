@@ -133,7 +133,7 @@ func readcovfile(path string) *coverageProfile {
 			"unable to merge coverage profile data file %q: %s",
 			toOutputDir(path), err.Error()))
 	}
-	defer cpf.Close()
+	defer func() { _ = cpf.Close() }()
 	scan := bufio.NewScanner(cpf)
 	if !scan.Scan() {
 		return nil

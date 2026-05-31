@@ -16,7 +16,7 @@ package testing
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
@@ -30,8 +30,8 @@ func capturestdout(f func()) (stderr string) {
 	r, w, _ := os.Pipe()
 	defer func() {
 		os.Stderr = origStderr
-		r.Close()
-		w.Close()
+		_ = r.Close()
+		_ = w.Close()
 	}()
 	os.Stderr = w
 	// Run function f() only on this thread, as Gomego doesn't like it
@@ -40,7 +40,7 @@ func capturestdout(f func()) (stderr string) {
 	// set the return value and signal that it's done.
 	done := make(chan struct{})
 	go func() {
-		b, _ := ioutil.ReadAll(r)
+		b, _ := io.ReadAll(r)
 		stderr = string(b)
 		close(done)
 	}()
@@ -48,7 +48,7 @@ func capturestdout(f func()) (stderr string) {
 	// Shut down the writer end, so the pipe reader knows that capturing
 	// stderr is finished, and can retrieve the complete captured output. We
 	// wait for the pipe reader to be finally done before returning.
-	w.Close()
+	_ = w.Close()
 	<-done
 	return
 }

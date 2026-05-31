@@ -1,10 +1,10 @@
 # gons
 
-[![Go Reference](https://pkg.go.dev/badge/godoc.org/github.com/TheDiveO/gons.svg)](https://pkg.go.dev/github.com/TheDiveO/gons)
+[![Go Reference](https://pkg.go.dev/badge/godoc.org/github.com/thediveo/gons.svg)](https://pkg.go.dev/github.com/thediveo/gons)
 [![GitHub](https://img.shields.io/github/license/thediveo/gons)](https://img.shields.io/github/license/thediveo/gons)
-![build and test](https://github.com/TheDiveO/gons/workflows/build%20and%20test/badge.svg?branch=master)
+![build and test](https://github.com/thediveo/gons/actions/workflows/buildandtest.yaml/badge.svg?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/thediveo/gons)](https://goreportcard.com/report/github.com/thediveo/gons)
-![Coverage](https://img.shields.io/badge/Coverage-82.9%25-brightgreen)
+![Coverage](https://img.shields.io/badge/Coverage-83.8%25-brightgreen)
 
 ## gons
 
@@ -127,7 +127,19 @@ parameter. But instead of directly calling `m.Run()` we have to wrap it into a
 the magic to cause re-executed actions to write coverage profile data and to
 merge it with the main process' coverage profile data.
 
+## DevContainer
+
+> [!CAUTION]
+>
+> Do **not** use VSCode's "~~Dev Containers: Clone Repository in Container
+> Volume~~" command, as it is utterly broken by design, ignoring
+> `.devcontainer/devcontainer.json`.
+
+1. `git clone https://github.com/thediveo/gons`
+2. in VSCode: Ctrl+Shift+P, "Dev Containers: Open Workspace in Container..."
+3. select `gons.code-workspace` and off you go...
+
 ## Copyright and License
 
-`gons` is Copyright 2019-23 Harald Albrecht, and licensed under the Apache
+`gons` is Copyright 2019-26 Harald Albrecht, and licensed under the Apache
 License, Version 2.0.
