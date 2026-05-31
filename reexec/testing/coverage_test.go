@@ -17,7 +17,6 @@ package testing
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/thediveo/gons/reexec"
@@ -35,10 +34,10 @@ func init() {
 func copyfile(from, to string) {
 	ffrom, err := os.Open(from)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
-	defer ffrom.Close()
+	defer func() { _ = ffrom.Close() }()
 	fto, err := os.Create(to)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
-	defer fto.Close()
+	defer func() { _ = fto.Close() }()
 	_, err = io.Copy(fto, ffrom)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 }
@@ -67,11 +66,11 @@ var _ = Describe("coveraging re-execution", func() {
 		if os.Getegid() == 0 {
 			Skip("only non-root")
 		}
-		tmpdir, err := ioutil.TempDir("", "covreport")
+		tmpdir, err := os.MkdirTemp("", "covreport")
 		Expect(err).NotTo(HaveOccurred())
-		defer os.RemoveAll(tmpdir)
+		defer func() { _ = os.RemoveAll(tmpdir) }()
 		copyfile("test/cov1.cov", tmpdir+"/main.cov")
-		Expect(os.Chmod(tmpdir+"/main.cov", 0400))
+		Expect(os.Chmod(tmpdir+"/main.cov", 0400)).To(Succeed())
 		defer func() { _ = os.Chmod(tmpdir+"/main.cov", 0600) }()
 		Expect(func() {
 			mergeAndReportCoverages(tmpdir+"/main.cov", []string{})
@@ -94,17 +93,17 @@ var _ = Describe("coveraging re-execution", func() {
 	})
 
 	It("merges coverage reports and writes merged report", func() {
-		tmpdir, err := ioutil.TempDir("", "covreport")
+		tmpdir, err := os.MkdirTemp("", "covreport")
 		Expect(err).NotTo(HaveOccurred())
-		defer os.RemoveAll(tmpdir)
+		defer func() { _ = os.RemoveAll(tmpdir) }()
 		copyfile("test/cov1.cov", tmpdir+"/main.cov")
 
 		mergeAndReportCoverages(
 			tmpdir+"/main.cov",
 			[]string{"test/cov2.cov"})
-		actualfinalreport, err := ioutil.ReadFile(tmpdir + "/main.cov")
+		actualfinalreport, err := os.ReadFile(tmpdir + "/main.cov")
 		Expect(err).NotTo(HaveOccurred())
-		finalreport, err := ioutil.ReadFile("test/final.cov")
+		finalreport, err := os.ReadFile("test/final.cov")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(actualfinalreport)).To(Equal(string(finalreport)))
 	})

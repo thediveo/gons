@@ -112,8 +112,8 @@ type Namespace struct {
 type ReexecAction struct {
 	ActionName  string      // name of action to run in re-executed child.
 	Namespaces  []Namespace // namespaces to switch into before executing action.
-	Param       interface{} // optional parameter to be sent to the action.
-	Result      interface{} // where to put the action result to.
+	Param       any         // optional parameter to be sent to the action.
+	Result      any         // where to put the action result to.
 	Environment []string    // optional environment variables to pass to re-executed child.
 }
 
@@ -134,9 +134,9 @@ func NewReexecAction(actionname string, options ...ReexecActionOption) *ReexecAc
 	return a
 }
 
-// RunExecAction runs the named action in a forked and re-executed child copy of
-// this process with the specified options and returns only after the action in
-// the child has finished.
+// RunReexecAction runs the named action in a forked and re-executed child copy
+// of this process with the specified options and returns only after the action
+// in the child has finished.
 func RunReexecAction(actionname string, options ...ReexecActionOption) error {
 	return NewReexecAction(actionname, options...).Run()
 }
@@ -151,7 +151,7 @@ func Namespaces(namespaces []Namespace) ReexecActionOption {
 
 // Param specifies an (optional) parameter to be sent to the (re-executed) named
 // action.
-func Param(param interface{}) ReexecActionOption {
+func Param(param any) ReexecActionOption {
 	return func(a *ReexecAction) {
 		a.Param = param
 	}
@@ -159,7 +159,7 @@ func Param(param interface{}) ReexecActionOption {
 
 // Result specifies where to place the result received from the (re-executed)
 // named action.
-func Result(result interface{}) ReexecActionOption {
+func Result(result any) ReexecActionOption {
 	return func(a *ReexecAction) {
 		a.Result = result
 	}
@@ -237,7 +237,7 @@ func (a *ReexecAction) Run() (err error) {
 				"gons/reexec: ReexecAction.Run: cannot prepare for restarting my fork, reason: %s",
 				err.Error()))
 		}
-		defer childin.Close()
+		defer func() { _ = childin.Close() }()
 		encoder = json.NewEncoder(childin)
 	}
 	// Get the stdout pipe from the child.
@@ -247,7 +247,7 @@ func (a *ReexecAction) Run() (err error) {
 			"gons/reexec: ReexecAction.Run: cannot prepare for restarting my fork, reason: %s",
 			err.Error()))
 	}
-	defer childout.Close()
+	defer func() { _ = childout.Close() }()
 	// Get the stderr pipe from the child and collect any data we might receive.
 	// Unfortunately, we can't use the buffer writer directly without further
 	// measures as this creates a race condition in those situations where we
@@ -263,7 +263,7 @@ func (a *ReexecAction) Run() (err error) {
 	errdone := make(chan struct{}, 1)
 	go func() {
 		defer close(errdone)
-		io.Copy(&childerr, errpipe)
+		_, _ = io.Copy(&childerr, errpipe)
 	}()
 	decoder := json.NewDecoder(childout)
 	if err := forkchild.Start(); err != nil {

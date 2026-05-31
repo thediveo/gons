@@ -19,10 +19,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/thediveo/gons"
-	"github.com/thediveo/gons/reexec"
 	"github.com/thediveo/lxkns/ops"
 	"github.com/thediveo/testbasher"
+
+	"github.com/thediveo/gons"
+	"github.com/thediveo/gons/reexec"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,7 +37,7 @@ func init() {
 			nsid, _ := ops.NamespacePath("/proc/self/ns/" + t).ID()
 			ns = append(ns, fmt.Sprintf("%d", nsid.Ino))
 		}
-		fmt.Fprintln(os.Stdout, "[", strings.Join(ns, ","), "]")
+		_, _ = fmt.Fprintln(os.Stdout, "[", strings.Join(ns, ","), "]")
 	})
 }
 

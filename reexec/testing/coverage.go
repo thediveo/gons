@@ -58,8 +58,8 @@ func mergeWithCoverProfileAndReport(sumcp *coverageProfile, childcovprofs []stri
 	if err != nil {
 		panic("cannot report summary coverage profile data: " + err.Error())
 	}
-	defer f.Close()
-	fmt.Fprintf(f, "mode: %s\n", sumcp.Mode)
+	defer func() { _ = f.Close() }()
+	_, _ = fmt.Fprintf(f, "mode: %s\n", sumcp.Mode)
 	// To make testing deterministic, we need to deterministically sort the
 	// source filename keys, as otherwise the map may iterate in arbitrary
 	// order over the sources.
@@ -72,7 +72,7 @@ func mergeWithCoverProfileAndReport(sumcp *coverageProfile, childcovprofs []stri
 	sort.Strings(sourcenames)
 	for _, sourcename := range sourcenames {
 		for _, block := range sumcp.Sources[sourcename].Blocks {
-			fmt.Fprintf(f, "%s:%d.%d,%d.%d %d %d\n",
+			_, _ = fmt.Fprintf(f, "%s:%d.%d,%d.%d %d %d\n",
 				sourcename,
 				block.StartLine, block.StartCol,
 				block.EndLine, block.EndCol,
@@ -85,7 +85,7 @@ func mergeWithCoverProfileAndReport(sumcp *coverageProfile, childcovprofs []stri
 // parseCoverageArgs gathers the output directory and cover profile file from
 // the CLI arguments.
 func parseCoverageArgs(args []string) {
-	for idx := 0; idx < len(args); idx++ {
+	for idx := range args {
 		arg := args[idx]
 		if strings.HasPrefix(arg, "-test.outputdir=") {
 			outputDir = strings.SplitN(arg, "=", 2)[1]

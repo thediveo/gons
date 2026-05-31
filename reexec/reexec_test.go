@@ -27,20 +27,20 @@ import (
 
 func init() {
 	Register("action", func() {
-		fmt.Fprintln(os.Stdout, `"done"`)
+		_, _ = fmt.Fprintln(os.Stdout, `"done"`)
 	})
 	Register("sleepy", func() {
-		fmt.Fprintln(os.Stdout, `"sleeping"`)
+		_, _ = fmt.Fprintln(os.Stdout, `"sleeping"`)
 		// Just keep this re-executed child action sleeping; we will be killed
 		// by our parent when the test is done. What a lovely family.
 		select {}
 	})
 	Register("unintelligible", func() {
 		// Return something the parent process didn't expect.
-		fmt.Fprintln(os.Stdout, `42`)
+		_, _ = fmt.Fprintln(os.Stdout, `42`)
 	})
 	Register("envvar", func() {
-		fmt.Fprintf(os.Stdout, "%q\n", os.Getenv("foobar"))
+		_, _ = fmt.Fprintf(os.Stdout, "%q\n", os.Getenv("foobar"))
 	})
 	Register("withparam", func() {
 		var param string
@@ -48,7 +48,7 @@ func init() {
 			fmt.Fprint(os.Stderr, err.Error())
 			return
 		}
-		fmt.Fprintf(os.Stdout, "%q\n", "xx"+param)
+		_, _ = fmt.Fprintf(os.Stdout, "%q\n", "xx"+param)
 	})
 	Register("reexec", func() {
 		_ = ForkReexec("reexec", []Namespace{}, nil)
@@ -63,9 +63,9 @@ var _ = Describe("reexec", func() {
 		osExit = func(code int) { ec = code }
 		defer func() {
 			osExit = os.Exit
-			os.Setenv(magicEnvVar, "")
+			_ = os.Setenv(magicEnvVar, "")
 		}()
-		os.Setenv(magicEnvVar, "silent")
+		_ = os.Setenv(magicEnvVar, "silent")
 		CheckAction()
 		Expect(ec).To(Equal(0))
 	})

@@ -51,7 +51,7 @@ func (m *M) run() (exitcode int, reexeced bool) {
 	// result in an import cycle. To break this vicious cycle we use
 	// testsupport's RunAction instead, which gons.reexec will initialize to
 	// point to its real implementation of RunAction.
-	var recovered interface{}
+	var recovered any
 	func() {
 		// RunAction() panics when it is asked to run a non-registered action.
 		// But we still want to write coverage profile data, so we need to
