@@ -6,8 +6,9 @@ require (
 	github.com/onsi/ginkgo/v2 v2.29.0
 	github.com/onsi/gomega v1.41.0
 	github.com/thediveo/lxkns v0.45.2
-	github.com/thediveo/testbasher v1.0.9
 )
+
+require github.com/dustinkirkland/golang-petname v0.0.0-20260215035315-f0c533e9ce9b // indirect
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
@@ -16,6 +17,7 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936 // indirect
 	github.com/thediveo/ioctl v0.9.4 // indirect
+	github.com/thediveo/spacetest v0.12.0
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/mod v0.35.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
