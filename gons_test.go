@@ -71,9 +71,9 @@ var _ = Describe("gons", func() {
 
 		spc := spacer.New(ctx, spacer.WithOut(GinkgoWriter), spacer.WithErr(GinkgoWriter))
 		DeferCleanup(spc.Close)
-		subspc, ns := spc.Subspace(true, false)
+		subspc, usernsfd := spc.NewTransientUser()
 		DeferCleanup(subspc.Close)
-		userns := nsref(ns.User)
+		userns := nsref(usernsfd)
 
 		morens := subspc.Rooms(false, false, true, true, false, false)
 		mntns := nsref(morens.Mnt)

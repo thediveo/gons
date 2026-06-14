@@ -325,7 +325,7 @@ func (a *ReexecAction) Run() (err error) {
 // call returns after the child process has terminated.
 //
 // Deprecated: use RunReexecAction("foo", Namespaces(n), Result(r)) instead.
-func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (err error) {
+func ForkReexec(actionname string, namespaces []Namespace, result any) (err error) {
 	return RunReexecAction(
 		actionname,
 		Namespaces(namespaces),
@@ -340,7 +340,7 @@ func ForkReexec(actionname string, namespaces []Namespace, result interface{}) (
 //
 // Deprecated: use RunReexecAction("foo", Namespaces(n), Environment(env),
 // Result(r)) instead.
-func ForkReexecEnv(actionname string, namespaces []Namespace, envvars []string, result interface{}) (err error) {
+func ForkReexecEnv(actionname string, namespaces []Namespace, envvars []string, result any) (err error) {
 	return RunReexecAction(
 		actionname,
 		Namespaces(namespaces),
