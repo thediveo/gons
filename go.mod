@@ -17,7 +17,7 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936 // indirect
 	github.com/thediveo/ioctl v0.9.5 // indirect
-	github.com/thediveo/spacetest v0.12.1
+	github.com/thediveo/spacetest v0.14.0
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
